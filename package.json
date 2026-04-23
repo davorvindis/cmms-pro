@@ -1,0 +1,16 @@
+{
+  "name": "cmms-produccion-beto",
+  "version": "1.0.0",
+  "description": "CMMS system tests — Playwright E2E for backoffice.html and qr.html",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:report": "playwright show-report",
+    "serve": "python3 -m http.server 8888 --directory ."
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.44.0"
+  }
+}

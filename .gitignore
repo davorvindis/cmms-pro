@@ -1,0 +1,13 @@
+AGENTS.md
+.DS_Store
+node_modules/
+test-results/
+playwright-report/
+backend/cmms.db
+backend/cmms.db-shm
+backend/cmms.db-wal
+backend/.env
+cmms.db
+*.db-shm
+*.db-wal
+.claude/

@@ -1,0 +1,140 @@
+[
+    {
+        "id": "inject_parada_descanso_gd1",
+        "type": "inject",
+        "z": "bf0f0d25dc889b55",
+        "name": "parada descanso",
+        "props": [
+            { "p": "payload" },
+            { "p": "topic", "vt": "str" },
+            { "p": "motivo", "v": "Parada de descanso", "vt": "str" }
+        ],
+        "repeat": "1380",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 160,
+        "y": 900,
+        "wires": [["opcua_cant_descanso_gd1", "opcua_seg_descanso_gd1", "opcua_min_descanso_gd1", "opcua_hor_descanso_gd1"]]
+    },
+    {
+        "id": "opcua_cant_descanso_gd1",
+        "type": "OpcUa-Item",
+        "z": "bf0f0d25dc889b55",
+        "item": "ns=3;s=\"Bloque de datos_turno1\".\"Static_76\"",
+        "datatype": "Int32",
+        "value": "",
+        "name": "Cant parada descanso",
+        "x": 420,
+        "y": 840,
+        "wires": [["42ed4ace32c2b579"]]
+    },
+    {
+        "id": "opcua_seg_descanso_gd1",
+        "type": "OpcUa-Item",
+        "z": "bf0f0d25dc889b55",
+        "item": "ns=3;s=\"Bloque de datos_turno1\".\"Static_77\"",
+        "datatype": "Int32",
+        "value": "",
+        "name": "Seg parada descanso",
+        "x": 420,
+        "y": 880,
+        "wires": [["42ed4ace32c2b579"]]
+    },
+    {
+        "id": "opcua_min_descanso_gd1",
+        "type": "OpcUa-Item",
+        "z": "bf0f0d25dc889b55",
+        "item": "ns=3;s=\"Bloque de datos_turno1\".\"Static_78\"",
+        "datatype": "Int32",
+        "value": "",
+        "name": "Min parada descanso",
+        "x": 420,
+        "y": 920,
+        "wires": [["42ed4ace32c2b579"]]
+    },
+    {
+        "id": "opcua_hor_descanso_gd1",
+        "type": "OpcUa-Item",
+        "z": "bf0f0d25dc889b55",
+        "item": "ns=3;s=\"Bloque de datos_turno1\".\"Static_79\"",
+        "datatype": "Int32",
+        "value": "",
+        "name": "Hor parada descanso",
+        "x": 420,
+        "y": 960,
+        "wires": [["42ed4ace32c2b579"]]
+    },
+    {
+        "id": "inject_parada_descanso_gd2",
+        "type": "inject",
+        "z": "684848416b6fd691",
+        "name": "parada descanso",
+        "props": [
+            { "p": "payload" },
+            { "p": "topic", "vt": "str" },
+            { "p": "motivo", "v": "Parada de descanso", "vt": "str" }
+        ],
+        "repeat": "1380",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 160,
+        "y": 900,
+        "wires": [["opcua_cant_descanso_gd2", "opcua_seg_descanso_gd2", "opcua_min_descanso_gd2", "opcua_hor_descanso_gd2"]]
+    },
+    {
+        "id": "opcua_cant_descanso_gd2",
+        "type": "OpcUa-Item",
+        "z": "684848416b6fd691",
+        "item": "ns=3;s=\"Bloque de datos_turno1\".\"Static_76\"",
+        "datatype": "Int32",
+        "value": "",
+        "name": "Cant parada descanso",
+        "x": 420,
+        "y": 840,
+        "wires": [["3a3d3219fa8b6468"]]
+    },
+    {
+        "id": "opcua_seg_descanso_gd2",
+        "type": "OpcUa-Item",
+        "z": "684848416b6fd691",
+        "item": "ns=3;s=\"Bloque de datos_turno1\".\"Static_77\"",
+        "datatype": "Int32",
+        "value": "",
+        "name": "Seg parada descanso",
+        "x": 420,
+        "y": 880,
+        "wires": [["3a3d3219fa8b6468"]]
+    },
+    {
+        "id": "opcua_min_descanso_gd2",
+        "type": "OpcUa-Item",
+        "z": "684848416b6fd691",
+        "item": "ns=3;s=\"Bloque de datos_turno1\".\"Static_78\"",
+        "datatype": "Int32",
+        "value": "",
+        "name": "Min parada descanso",
+        "x": 420,
+        "y": 880,
+        "wires": [["3a3d3219fa8b6468"]]
+    },
+    {
+        "id": "opcua_hor_descanso_gd2",
+        "type": "OpcUa-Item",
+        "z": "684848416b6fd691",
+        "item": "ns=3;s=\"Bloque de datos_turno1\".\"Static_79\"",
+        "datatype": "Int32",
+        "value": "",
+        "name": "Hor parada descanso",
+        "x": 420,
+        "y": 960,
+        "wires": [["3a3d3219fa8b6468"]]
+    }
+]

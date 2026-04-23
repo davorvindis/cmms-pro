@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CMMS - Registro de Mantenimiento</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚙️</text></svg>">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #eef1f5; color: #1a1a2e; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+
+  /* Header */
+  .header { background: linear-gradient(135deg, #0f3460 0%, #1a5276 50%, #16213e 100%); color: white; padding: 18px 20px 16px; position: sticky; top: 0; z-index: 10; box-shadow: 0 4px 20px rgba(15,52,96,0.3); }
+  .header-top { display: flex; align-items: center; gap: 14px; }
+  .header-icon { width: 42px; height: 42px; background: rgba(255,255,255,0.15); border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; backdrop-filter: blur(10px); }
+  .header-icon svg { width: 22px; height: 22px; }
+  .header h1 { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
+  .header .scan-info { font-size: 12px; opacity: 0.65; margin-top: 3px; }
+  .header .user-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.12); padding: 5px 12px; border-radius: 20px; font-size: 11px; margin-top: 10px; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+  .header .user-badge::before { content: ''; width: 6px; height: 6px; background: #4ade80; border-radius: 50%; }
+
+  /* Equipo card */
+  .equipo-card { background: white; margin: 16px; border-radius: 16px; padding: 0; box-shadow: 0 2px 12px rgba(0,0,0,0.06); overflow: hidden; }
+  .equipo-card-header { background: linear-gradient(135deg, #f0f4fa 0%, #e8edf5 100%); padding: 18px 20px 14px; border-bottom: 1px solid #e0e6ef; }
+  .equipo-card-header h2 { font-size: 18px; color: #0f3460; margin-bottom: 2px; font-weight: 700; }
+  .equipo-card-header .equipo-id { font-size: 12px; color: #8899aa; font-family: 'SF Mono', 'Fira Code', monospace; }
+  .equipo-card-body { padding: 16px 20px; }
+  .equipo-card .ubicacion { font-size: 13px; color: #666; display: flex; align-items: center; gap: 6px; margin-bottom: 12px; }
+  .equipo-card .ubicacion svg { width: 14px; height: 14px; color: #999; flex-shrink: 0; }
+  .status { display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+  .status::before { content: ''; width: 6px; height: 6px; border-radius: 50%; }
+  .status.operativo { background: #dcfce7; color: #166534; }
+  .status.operativo::before { background: #22c55e; }
+  .status.alerta { background: #fef3c7; color: #92400e; }
+  .status.alerta::before { background: #f59e0b; }
+  .status.vencido { background: #fee2e2; color: #991b1b; }
+  .status.vencido::before { background: #ef4444; }
+
+  .componentes-label { font-size: 11px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.8px; margin: 14px 0 8px; }
+  .componentes-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+  .comp-chip { padding: 5px 11px; border-radius: 8px; font-size: 12px; font-weight: 600; background: #eef2ff; color: #3b5998; border: 1px solid #dbe4ff; }
+
+  .ultimo-mant { display: flex; gap: 0; margin-top: 16px; border-top: 1px solid #f0f0f0; }
+  .ultimo-mant-item { flex: 1; padding: 12px 0; text-align: center; }
+  .ultimo-mant-item:first-child { border-right: 1px solid #f0f0f0; }
+  .ultimo-mant-item .mant-label { font-size: 10px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; }
+  .ultimo-mant-item .mant-value { font-size: 14px; font-weight: 700; color: #1e293b; margin-top: 2px; }
+
+  /* Tabs */
+  .tabs { display: flex; margin: 0 16px; gap: 4px; background: #dde2ea; border-radius: 12px; padding: 4px; }
+  .tab { flex: 1; padding: 10px; text-align: center; font-size: 13px; font-weight: 600; border: none; cursor: pointer; background: transparent; color: #6b7280; border-radius: 10px; transition: all 0.25s ease; }
+  .tab.active { background: white; color: #0f3460; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* Form sections */
+  .form-section { background: white; margin: 12px 16px; border-radius: 16px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.04); }
+  .form-section:first-child { margin-top: 12px; }
+  .form-section h3 { font-size: 14px; color: #0f3460; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; font-weight: 700; }
+  .form-section h3 .section-icon { width: 32px; height: 32px; background: #eef2ff; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .form-section h3 .section-icon svg { width: 16px; height: 16px; }
+  .form-group { margin-bottom: 14px; }
+  .form-group:last-child { margin-bottom: 0; }
+  .form-group label { display: block; font-size: 12px; font-weight: 700; color: #6b7280; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.3px; }
+  .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 11px 14px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-size: 14px; font-family: inherit; transition: all 0.2s; background: #fafbfc; color: #1e293b; }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: #0f3460; background: white; box-shadow: 0 0 0 3px rgba(15,52,96,0.08); }
+  .form-group textarea { resize: vertical; min-height: 60px; }
+  .form-group input[readonly] { background: #f1f5f9; color: #94a3b8; border-color: #e2e8f0; }
+  .datetime-row { display: flex; gap: 10px; }
+  .datetime-row .form-group { flex: 1; }
+
+  /* Componentes intervenidos */
+  .componente-block { border: 1.5px solid #e2e8f0; border-radius: 14px; padding: 16px; margin-bottom: 12px; background: #fafbfc; transition: all 0.2s; }
+  .componente-block.active { border-color: #93a8d0; background: #f5f8ff; }
+  .comp-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 8px; }
+  .comp-number { width: 28px; height: 28px; background: #0f3460; color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+  .comp-header select { padding: 9px 12px; border: 1.5px solid #d1d5db; border-radius: 8px; font-size: 13px; font-weight: 600; color: #0f3460; flex: 1; background: white; }
+  .comp-trabajo { margin-bottom: 12px; }
+  .comp-trabajo textarea { width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; font-family: inherit; min-height: 50px; resize: vertical; background: white; }
+  .comp-trabajo textarea:focus { outline: none; border-color: #0f3460; box-shadow: 0 0 0 3px rgba(15,52,96,0.06); }
+  .comp-trabajo label, .repuestos-label { font-size: 11px; font-weight: 700; color: #9ca3af; display: block; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.3px; }
+
+  /* Repuestos */
+  .repuesto-row { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+  .repuesto-row select { flex: 2; padding: 9px 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; background: white; }
+  .repuesto-row select:focus { outline: none; border-color: #0f3460; }
+  .repuesto-row input.cant { width: 58px; flex: none; text-align: center; padding: 9px 6px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; font-weight: 600; background: white; }
+  .repuesto-row input.cant:focus { outline: none; border-color: #0f3460; }
+  .btn-remove { background: #fee2e2; color: #dc2626; border: none; border-radius: 8px; width: 32px; height: 32px; cursor: pointer; font-size: 14px; flex-shrink: 0; font-weight: 700; transition: all 0.15s; display: flex; align-items: center; justify-content: center; }
+  .btn-remove:active { background: #fecaca; transform: scale(0.95); }
+  .btn-add { background: white; border: 1.5px dashed #93a8d0; color: #0f3460; padding: 9px; border-radius: 10px; font-size: 12px; cursor: pointer; width: 100%; margin-top: 6px; font-weight: 600; transition: all 0.15s; }
+  .btn-add:active { background: #f0f4ff; }
+  .btn-add-comp { background: white; border: 2px dashed #c8d6e5; color: #0f3460; padding: 14px; border-radius: 14px; font-size: 13px; cursor: pointer; width: 100%; font-weight: 700; transition: all 0.15s; }
+  .btn-add-comp:active { background: #f0f4ff; border-color: #93a8d0; }
+
+  /* Resumen repuestos */
+  #resumen-repuestos { font-size: 13px; color: #9ca3af; }
+
+  /* Submit */
+  .btn-submit { width: calc(100% - 32px); padding: 15px; background: linear-gradient(135deg, #0f3460, #1a5276); color: white; border: none; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; margin: 8px 16px 28px; box-shadow: 0 4px 16px rgba(15,52,96,0.3); transition: all 0.15s; letter-spacing: -0.2px; }
+  .btn-submit:active { transform: scale(0.98); box-shadow: 0 2px 8px rgba(15,52,96,0.3); }
+
+  /* Success modal */
+  .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 100; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+  .modal-overlay.show { display: flex; }
+  .success-box { background: white; border-radius: 20px; padding: 36px 28px; text-align: center; margin: 20px; max-width: 360px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.15); }
+  .success-box .success-icon { width: 64px; height: 64px; background: #dcfce7; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
+  .success-box .success-icon svg { width: 32px; height: 32px; color: #22c55e; }
+  .success-box h3 { color: #166534; margin-bottom: 8px; font-size: 18px; }
+  .success-box p { color: #6b7280; font-size: 14px; margin-bottom: 20px; line-height: 1.5; }
+  .success-box button { padding: 12px 32px; background: #0f3460; color: white; border: none; border-radius: 10px; font-size: 14px; cursor: pointer; font-weight: 600; width: 100%; }
+
+  /* Login overlay */
+  .login-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, rgba(15,52,96,0.97), rgba(22,33,62,0.97)); z-index: 200; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
+  .login-overlay.show { display: flex; }
+  .login-box { background: white; border-radius: 20px; padding: 32px 28px; text-align: left; max-width: 360px; width: calc(100% - 40px); box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+  .login-box .login-header { text-align: center; margin-bottom: 24px; }
+  .login-box .login-logo { width: 56px; height: 56px; background: linear-gradient(135deg, #0f3460, #1a5276); border-radius: 16px; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; }
+  .login-box .login-logo svg { width: 28px; height: 28px; color: white; }
+  .login-box h3 { color: #0f3460; font-size: 20px; font-weight: 700; }
+  .login-box .login-sub { color: #9ca3af; font-size: 13px; margin-top: 4px; }
+  .login-box .form-group { margin-bottom: 14px; }
+  .login-box .form-group label { display: block; font-size: 12px; font-weight: 700; color: #6b7280; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.3px; }
+  .login-box .form-group input { width: 100%; padding: 12px 14px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-size: 15px; font-family: inherit; transition: all 0.2s; background: #fafbfc; }
+  .login-box .form-group input:focus { outline: none; border-color: #0f3460; background: white; box-shadow: 0 0 0 3px rgba(15,52,96,0.08); }
+  .login-box .btn-login { width: 100%; padding: 13px; background: linear-gradient(135deg, #0f3460, #1a5276); color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(15,52,96,0.25); margin-top: 6px; transition: all 0.15s; }
+  .login-box .btn-login:active { transform: scale(0.98); }
+  #login-error { color: #dc2626; font-size: 13px; display: none; margin-bottom: 8px; background: #fef2f2; padding: 8px 12px; border-radius: 8px; border: 1px solid #fecaca; }
+
+  /* Historial */
+  .historial-entry { border: 1px solid #e5e7eb; border-radius: 14px; padding: 16px; margin-bottom: 12px; background: white; transition: all 0.15s; }
+  .hist-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .hist-date { font-size: 15px; font-weight: 700; color: #0f3460; }
+  .hist-tipo { font-size: 11px; padding: 3px 10px; border-radius: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
+  .hist-tipo.preventivo { background: #dbeafe; color: #1e40af; }
+  .hist-tipo.correctivo { background: #fef3c7; color: #92400e; }
+  .hist-tipo.predictivo { background: #e0e7ff; color: #4338ca; }
+  .hist-tipo.emergencia { background: #fee2e2; color: #991b1b; }
+  .hist-meta { font-size: 12px; color: #9ca3af; margin-bottom: 12px; line-height: 1.5; }
+  .hist-comp { border-left: 3px solid #3b5998; padding: 10px 14px; margin-bottom: 8px; background: #f8fafc; border-radius: 0 10px 10px 0; }
+  .hist-comp-name { font-size: 13px; font-weight: 700; color: #0f3460; }
+  .hist-comp-trabajo { font-size: 13px; color: #4b5563; margin-top: 3px; line-height: 1.4; }
+  .hist-comp-repuestos { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
+  .hist-comp-repuestos span { background: #eef2ff; padding: 2px 8px; border-radius: 6px; font-size: 11px; color: #3b5998; font-weight: 600; border: 1px solid #dbe4ff; }
+  .hist-pendiente { background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 10px 14px; font-size: 12px; color: #92400e; margin-top: 10px; line-height: 1.4; }
+  .hist-pendiente strong { color: #78350f; }
+  .hist-empty { text-align: center; padding: 40px 20px; color: #9ca3af; }
+  .hist-empty svg { width: 48px; height: 48px; color: #d1d5db; margin-bottom: 12px; }
+  .hist-empty p { font-size: 14px; }
+
+  /* Spacing for bottom */
+  .bottom-spacer { height: 20px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <div class="header-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+    </div>
+    <div>
+      <h1>Registro de Mantenimiento</h1>
+      <div class="scan-info" id="scan-info">Cargando...</div>
+    </div>
+  </div>
+  <div class="user-badge" id="user-badge">-</div>
+</div>
+
+<!-- Ficha del equipo -->
+<div class="equipo-card" id="equipo-card">
+  <div class="equipo-card-header">
+    <div style="text-align:center;color:#9ca3af;padding:8px;">Cargando datos de la maquina...</div>
+  </div>
+</div>
+
+<!-- Historial -->
+<div id="tab-historial">
+  <div class="form-section">
+    <h3>
+      <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#0f3460" stroke-width="2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg></span>
+      Historial de mantenimiento
+    </h3>
+    <div id="historial-container">
+      <div class="hist-empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>
+        <p>Cargando historial...</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="bottom-spacer"></div>
+
+<!-- Login overlay -->
+<div class="login-overlay show" id="login-overlay">
+  <div class="login-box">
+    <div class="login-header">
+      <div class="login-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+      </div>
+      <h3>CMMS Pro</h3>
+      <div class="login-sub">Registro de Mantenimiento</div>
+    </div>
+    <div class="form-group">
+      <label>Usuario</label>
+      <input type="text" id="login-id" placeholder="Ej: data-entry1">
+    </div>
+    <div class="form-group">
+      <label>PIN</label>
+      <input type="password" id="login-pin" placeholder="****">
+    </div>
+    <div id="login-error"></div>
+    <button class="btn-login" onclick="doLogin()">Entrar</button>
+    <!-- DEV ONLY - NO SUBIR A PRODUCCION -->
+    <div id="dev-quick-login" style="margin-top:16px;padding-top:14px;border-top:2px dashed #ffc107;">
+      <div style="font-size:11px;font-weight:700;color:#856404;background:#fff3cd;padding:4px 8px;border-radius:4px;text-align:center;margin-bottom:10px;">DEV ONLY - Quick Login</div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <button class="btn-login" style="background:#0f3460;font-size:12px;padding:10px;box-shadow:none;" onclick="quickLogin('admin','1234')">Admin (admin / 1234)</button>
+        <button class="btn-login" style="background:#1a5276;font-size:12px;padding:10px;box-shadow:none;" onclick="quickLogin('data-entry1','1111')">Maciel - Data Entry (1111)</button>
+        <button class="btn-login" style="background:#2d6a8f;font-size:12px;padding:10px;box-shadow:none;" onclick="quickLogin('tecnico1','2222')">Juan Perez - Tecnico (2222)</button>
+      </div>
+    </div>
+    <!-- /DEV ONLY -->
+  </div>
+</div>
+
+<script>
+const API_BASE = 'http://localhost:8080/api';
+let currentUser = JSON.parse(localStorage.getItem('cmms_user') || 'null');
+let currentPin = localStorage.getItem('cmms_pin') || '';
+let maquinaData = null;
+let componentesData = [];
+
+function authHeaders() { return { 'X-User-ID': currentUser?.id || '', 'X-Pin': currentPin }; }
+
+async function api(path, opts = {}) {
+  const headers = { ...authHeaders(), ...opts.headers };
+  if (opts.body) headers['Content-Type'] = 'application/json';
+  const res = await fetch(API_BASE + path, { ...opts, headers });
+  if (res.status === 401) { logout(); return null; }
+  return res.json();
+}
+
+async function doLogin() {
+  const id = document.getElementById('login-id').value.trim();
+  const pin = document.getElementById('login-pin').value.trim();
+  const errEl = document.getElementById('login-error');
+  if (!id || !pin) { errEl.textContent = 'Complete ambos campos'; errEl.style.display = 'block'; return; }
+  const res = await fetch(API_BASE + '/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, pin }) });
+  if (!res.ok) { errEl.textContent = 'Credenciales invalidas'; errEl.style.display = 'block'; return; }
+  currentUser = await res.json();
+  currentPin = pin;
+  localStorage.setItem('cmms_user', JSON.stringify(currentUser));
+  localStorage.setItem('cmms_pin', pin);
+  document.getElementById('login-overlay').classList.remove('show');
+  init();
+}
+
+function quickLogin(id, pin) {
+  document.getElementById('login-id').value = id;
+  document.getElementById('login-pin').value = pin;
+  doLogin();
+}
+
+function logout() {
+  currentUser = null; currentPin = '';
+  localStorage.removeItem('cmms_user'); localStorage.removeItem('cmms_pin');
+  document.getElementById('login-overlay').classList.add('show');
+}
+
+document.getElementById('login-pin').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+if (currentUser) {
+  document.getElementById('login-overlay').classList.remove('show');
+  init();
+}
+
+async function init() {
+  const maqId = new URLSearchParams(location.search).get('maquina') || 'MAQ-001';
+  const now = new Date();
+  document.getElementById('scan-info').textContent = `Escaneado: ${now.toLocaleDateString('es-AR')} - ${now.toTimeString().slice(0, 5)}hs`;
+  document.getElementById('user-badge').textContent = `${currentUser.rol}: ${currentUser.nombre}`;
+
+  const maq = await api('/maquinas/' + maqId);
+  if (!maq) return;
+
+  maquinaData = maq;
+  componentesData = maq.componentes || [];
+
+  renderEquipoCard();
+  loadHistorial();
+}
+
+function renderEquipoCard() {
+  const m = maquinaData;
+  const fmtDate = d => d ? d.split('-').reverse().join('/') : '-';
+  const statusClass = m.estado === 'Operativo' ? 'operativo' : m.estado === 'Mant. vencido' ? 'vencido' : 'alerta';
+  document.getElementById('equipo-card').innerHTML = `
+    <div class="equipo-card-header">
+      <h2>${m.nombre}</h2>
+      <div class="equipo-id">${m.id}${m.serie ? ' &middot; Serie: ' + m.serie : ''}</div>
+    </div>
+    <div class="equipo-card-body">
+      <div class="ubicacion">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        ${m.ubicacion}
+      </div>
+      <span class="status ${statusClass}">${m.estado}</span>
+      <div class="componentes-label">Componentes de esta maquina</div>
+      <div class="componentes-grid">${componentesData.map(c => `<span class="comp-chip">${c.nombre}</span>`).join('')}</div>
+      <div class="ultimo-mant">
+        <div class="ultimo-mant-item">
+          <div class="mant-label">Ultimo mant.</div>
+          <div class="mant-value">${fmtDate(m.ultimo_mantenimiento)}</div>
+        </div>
+        <div class="ultimo-mant-item">
+          <div class="mant-label">Proximo</div>
+          <div class="mant-value" ${m.estado === 'Mant. vencido' ? 'style="color:#dc2626;"' : ''}>${fmtDate(m.proximo_mantenimiento)}</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function loadHistorial() {
+  if (!maquinaData) return;
+  const registros = await api('/maquinas/' + maquinaData.id + '/registros');
+  const container = document.getElementById('historial-container');
+  if (!registros || !registros.length) {
+    container.innerHTML = `<div class="hist-empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>
+      <p>Sin registros anteriores para esta maquina</p>
+    </div>`;
+    return;
+  }
+
+  container.innerHTML = registros.map(r => {
+    const parts = r.fecha.split(' ');
+    const fecha = parts[0].split('-').reverse().join('/');
+    const hora = parts[1] ? parts[1].slice(0, 5) + 'hs' : '';
+    const tipoClass = r.tipo.toLowerCase();
+    const compsHtml = (r.componentes || []).map(c => {
+      const reps = (c.repuestos || []).map(rr => `<span>${rr.repuesto_descripcion} x${rr.cantidad}</span>`).join('');
+      const trabajo = c.trabajo_realizado ? `<div class="hist-comp-trabajo">${c.trabajo_realizado}</div>` : '';
+      return `<div class="hist-comp">
+        <div class="hist-comp-name">${c.componente_nombre}</div>
+        ${trabajo}
+        ${reps ? `<div class="hist-comp-repuestos">${reps}</div>` : ''}
+      </div>`;
+    }).join('');
+    const pendiente = r.observaciones ? `<div class="hist-pendiente"><strong>Pendiente:</strong> ${r.observaciones}</div>` : '';
+    return `<div class="historial-entry">
+      <div class="hist-header">
+        <div>
+          <div class="hist-date">${fecha} - ${hora}</div>
+          <div class="hist-meta">Tecnico: ${r.tecnico_nombre} | Registro: ${r.registrado_por_nombre}</div>
+        </div>
+        <span class="hist-tipo ${tipoClass}">${r.tipo}</span>
+      </div>
+      ${compsHtml}${pendiente}
+    </div>`;
+  }).join('');
+}
+
+</script>
+</body>
+</html>

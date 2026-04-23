@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CMMS Pro - Backoffice</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚙️</text></svg>">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #1a1a2e; }
+  .layout { display: flex; min-height: 100vh; }
+
+  /* Sidebar */
+  .sidebar { width: 240px; background: linear-gradient(180deg, #0f3460, #16213e); color: white; position: fixed; height: 100vh; overflow-y: auto; }
+  .sidebar .logo { padding: 20px; font-size: 20px; font-weight: 700; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 10px; }
+  .sidebar .logo svg { width: 28px; height: 28px; }
+  .sidebar nav { padding: 12px 0; }
+  .sidebar a { display: flex; align-items: center; gap: 10px; padding: 11px 20px; color: rgba(255,255,255,0.7); text-decoration: none; font-size: 14px; transition: all 0.2s; cursor: pointer; }
+  .sidebar a:hover, .sidebar a.active { background: rgba(255,255,255,0.1); color: white; }
+  .sidebar a.active { border-left: 3px solid #e94560; }
+  .sidebar a svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .sidebar .section-title { padding: 16px 20px 6px; font-size: 11px; text-transform: uppercase; color: rgba(255,255,255,0.4); letter-spacing: 1px; }
+
+  /* Main */
+  .main { flex: 1; margin-left: 240px; }
+  .topbar { background: white; padding: 16px 28px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e0e0e0; position: sticky; top: 0; z-index: 10; }
+  .topbar h2 { font-size: 20px; color: #16213e; }
+  .topbar .user { display: flex; align-items: center; gap: 10px; font-size: 14px; color: #555; }
+  .topbar .avatar { width: 34px; height: 34px; border-radius: 50%; background: #0f3460; color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; }
+  .content { padding: 24px 28px; }
+
+  /* Stats */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .stat-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .stat-card .label { font-size: 13px; color: #888; margin-bottom: 6px; }
+  .stat-card .value { font-size: 28px; font-weight: 700; color: #16213e; }
+  .stat-card .change { font-size: 12px; margin-top: 4px; }
+  .stat-card .change.up { color: #28a745; }
+  .stat-card .change.down { color: #dc3545; }
+
+  /* Panel */
+  .panel { background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 24px; }
+  .panel-header { padding: 18px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+  .panel-header h3 { font-size: 16px; color: #16213e; }
+  .panel-header .actions { display: flex; gap: 8px; align-items: center; }
+  .btn { padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; }
+  .btn-primary { background: #0f3460; color: white; }
+  .btn-outline { background: white; color: #0f3460; border: 1.5px solid #0f3460; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn-danger-sm { padding: 5px 10px; font-size: 12px; background: #f8d7da; color: #721c24; border: none; border-radius: 6px; cursor: pointer; }
+  .search-input { padding: 8px 14px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 13px; width: 220px; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; padding: 12px 20px; font-size: 12px; text-transform: uppercase; color: #888; letter-spacing: 0.5px; border-bottom: 1px solid #eee; background: #fafafa; }
+  td { padding: 12px 20px; font-size: 14px; border-bottom: 1px solid #f0f0f0; }
+  tr:hover td { background: #f8f9ff; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+  .badge-green { background: #d4edda; color: #155724; }
+  .badge-yellow { background: #fff3cd; color: #856404; }
+  .badge-red { background: #f8d7da; color: #721c24; }
+  .badge-blue { background: #d1ecf1; color: #0c5460; }
+  .badge-gray { background: #e9ecef; color: #495057; }
+
+  /* Grid */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+
+  /* Activity */
+  .activity-item { display: flex; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #f0f0f0; }
+  .activity-item:last-child { border: none; }
+  .activity-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
+  .activity-dot.mant { background: #0f3460; }
+  .activity-dot.alerta { background: #e94560; }
+  .activity-dot.repuesto { background: #f0a500; }
+  .activity-text { font-size: 13px; color: #333; }
+  .activity-time { font-size: 11px; color: #999; margin-top: 2px; }
+
+  /* Alert */
+  .alert-item { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #f0f0f0; }
+  .alert-item:last-child { border: none; }
+  .alert-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 700; }
+  .alert-icon.warning { background: #fff3cd; color: #856404; }
+  .alert-icon.danger { background: #f8d7da; color: #721c24; }
+  .alert-text { font-size: 13px; color: #333; }
+  .alert-date { font-size: 11px; color: #999; }
+
+  /* Bar chart */
+  .bar-chart { display: flex; align-items: flex-end; gap: 12px; height: 160px; padding: 0 20px; }
+  .bar-group { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; }
+  .bar { width: 100%; background: linear-gradient(180deg, #0f3460, #1a5276); border-radius: 4px 4px 0 0; min-height: 8px; }
+  .bar-label { font-size: 11px; color: #888; }
+  .bar-value { font-size: 11px; color: #0f3460; font-weight: 600; }
+
+  /* Pages */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* Repuestos category */
+  .cat-header { display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: #f0f4fa; font-size: 13px; font-weight: 700; color: #0f3460; border-bottom: 1px solid #e0e0e0; }
+  .cat-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .stock-bar { width: 80px; height: 6px; background: #e9ecef; border-radius: 3px; overflow: hidden; display: inline-block; vertical-align: middle; }
+  .stock-bar .fill { height: 100%; border-radius: 3px; }
+  .stock-bar .fill.ok { background: #28a745; }
+  .stock-bar .fill.low { background: #ffc107; }
+  .stock-bar .fill.critical { background: #dc3545; }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; }
+  .modal-overlay.show { display: flex; }
+  .modal { background: white; border-radius: 16px; width: 520px; max-height: 80vh; overflow-y: auto; }
+  .modal-header { padding: 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+  .modal-header h3 { font-size: 18px; }
+  .modal-close { background: none; border: none; font-size: 24px; cursor: pointer; color: #999; }
+  .modal-body { padding: 20px; }
+  .modal-body .form-group { margin-bottom: 14px; }
+  .modal-body label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-bottom: 6px; }
+  .modal-body input, .modal-body select, .modal-body textarea { width: 100%; padding: 10px 12px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 14px; font-family: inherit; }
+  .modal-body input:focus, .modal-body select:focus { outline: none; border-color: #0f3460; }
+  .modal-footer { padding: 16px 20px; border-top: 1px solid #eee; display: flex; justify-content: flex-end; gap: 8px; }
+
+  .comp-list-inline { display: flex; flex-wrap: wrap; gap: 4px; }
+  .comp-chip-sm { padding: 2px 8px; border-radius: 4px; font-size: 11px; background: #e8edf3; color: #0f3460; }
+
+  /* Dynamic component/repuesto blocks in registro modal */
+  .registro-comp-block { background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+  .registro-comp-block .block-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .registro-comp-block .block-header strong { font-size: 13px; color: #0f3460; }
+  .registro-comp-block .btn-remove { background: none; border: none; color: #dc3545; cursor: pointer; font-size: 16px; }
+  .registro-comp-block .form-row { display: flex; gap: 8px; margin-bottom: 6px; }
+  .registro-comp-block .form-row select, .registro-comp-block .form-row input { flex: 1; padding: 7px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
+  .registro-rep-item { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
+  .registro-rep-item select { flex: 2; }
+  .registro-rep-item input { flex: 1; max-width: 70px; }
+  .btn-add-sm { padding: 4px 10px; font-size: 12px; background: #e8edf3; color: #0f3460; border: 1px solid #c8d6e5; border-radius: 6px; cursor: pointer; margin-top: 6px; }
+
+  /* QR Modal */
+  .qr-modal-body { text-align: center; padding: 28px 20px; }
+  .qr-maquina-name { font-size: 20px; font-weight: 700; color: #16213e; margin-bottom: 2px; }
+  .qr-maquina-id { font-size: 13px; color: #888; font-family: 'SF Mono', 'Fira Code', monospace; margin-bottom: 4px; }
+  .qr-maquina-ubicacion { font-size: 13px; color: #666; margin-bottom: 16px; }
+  #qr-canvas-container { display: inline-block; padding: 16px; background: white; border: 2px solid #e0e0e0; border-radius: 12px; margin-bottom: 16px; }
+  #qr-canvas-container canvas { display: block; }
+  .qr-url { font-size: 11px; color: #aaa; word-break: break-all; max-width: 400px; margin: 0 auto 16px; }
+  .qr-print-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+  /* Print styles */
+  @media print {
+    body * { visibility: hidden; }
+    #qr-print-area, #qr-print-area * { visibility: visible; }
+    #qr-print-area { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: white; }
+    .qr-print-sheet { text-align: center; }
+    .qr-print-sheet .qr-print-title { font-size: 28px; font-weight: 700; color: #000; margin-bottom: 4px; }
+    .qr-print-sheet .qr-print-id { font-size: 16px; color: #444; font-family: monospace; margin-bottom: 4px; }
+    .qr-print-sheet .qr-print-ubicacion { font-size: 14px; color: #666; margin-bottom: 20px; }
+    .qr-print-sheet canvas { display: block; margin: 0 auto 16px; }
+    .qr-print-sheet .qr-print-footer { font-size: 11px; color: #999; margin-top: 12px; }
+  }
+
+  @media (max-width: 1200px) { .stats { grid-template-columns: repeat(2, 1fr); } .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+      CMMS Pro
+    </div>
+    <nav>
+      <div class="section-title">General</div>
+      <a class="active" onclick="showPage('dashboard', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        Dashboard
+      </a>
+      <a onclick="showPage('equipos', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a4 4 0 00-8 0v2"/></svg>
+        Maquinas / Activos
+      </a>
+
+      <div class="section-title">Mantenimiento</div>
+      <a onclick="showPage('ordenes', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+        Registros de Mant.
+      </a>
+
+      <div class="section-title">Inventario</div>
+      <a onclick="showPage('repuestos', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+        Repuestos
+      </a>
+
+      <div class="section-title">Personas</div>
+      <a onclick="showPage('usuarios', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+        Tecnicos & Usuarios
+      </a>
+
+      <div class="section-title">Reportes</div>
+      <a>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+        Reportes
+      </a>
+    </nav>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <h2 id="page-title">Dashboard</h2>
+      <div class="user">
+        <span id="topbar-user">Admin</span>
+        <div class="avatar" id="topbar-avatar">DV</div>
+        <button class="btn btn-sm" style="background:#f8d7da;color:#721c24;margin-left:8px;" onclick="logout()">Salir</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ============ PAGE: DASHBOARD ============ -->
+      <div id="page-dashboard" class="page active">
+        <div class="stats" id="dashboard-stats">
+          <div class="stat-card"><div class="label">Maquinas Activas</div><div class="value" id="stat-maquinas">-</div></div>
+          <div class="stat-card"><div class="label">Mantenimientos pendientes</div><div class="value" id="stat-pendientes">-</div><div class="change down" id="stat-vencidos"></div></div>
+          <div class="stat-card"><div class="label">Registros este mes</div><div class="value" id="stat-registros">-</div></div>
+          <div class="stat-card"><div class="label">Repuestos stock bajo</div><div class="value" id="stat-stockbajo">-</div><div class="change down">Requieren reposicion</div></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Mantenimientos por mes</h3>
+          </div>
+          <div style="padding: 20px;">
+            <div class="bar-chart">
+              <div class="bar-group"><div class="bar-value">18</div><div class="bar" style="height:90px;"></div><div class="bar-label">Ene</div></div>
+              <div class="bar-group"><div class="bar-value">14</div><div class="bar" style="height:70px;"></div><div class="bar-label">Feb</div></div>
+              <div class="bar-group"><div class="bar-value">22</div><div class="bar" style="height:110px;"></div><div class="bar-label">Mar</div></div>
+              <div class="bar-group"><div class="bar-value">23</div><div class="bar" style="height:115px; background: linear-gradient(180deg, #e94560, #c23152);"></div><div class="bar-label">Abr</div></div>
+              <div class="bar-group"><div class="bar-value">-</div><div class="bar" style="height:8px; opacity:0.3;"></div><div class="bar-label">May</div></div>
+              <div class="bar-group"><div class="bar-value">-</div><div class="bar" style="height:8px; opacity:0.3;"></div><div class="bar-label">Jun</div></div>
+              <div class="bar-group"><div class="bar-value">-</div><div class="bar" style="height:8px; opacity:0.3;"></div><div class="bar-label">Jul</div></div>
+              <div class="bar-group"><div class="bar-value">-</div><div class="bar" style="height:8px; opacity:0.3;"></div><div class="bar-label">Ago</div></div>
+              <div class="bar-group"><div class="bar-value">-</div><div class="bar" style="height:8px; opacity:0.3;"></div><div class="bar-label">Sep</div></div>
+              <div class="bar-group"><div class="bar-value">-</div><div class="bar" style="height:8px; opacity:0.3;"></div><div class="bar-label">Oct</div></div>
+              <div class="bar-group"><div class="bar-value">-</div><div class="bar" style="height:8px; opacity:0.3;"></div><div class="bar-label">Nov</div></div>
+              <div class="bar-group"><div class="bar-value">-</div><div class="bar" style="height:8px; opacity:0.3;"></div><div class="bar-label">Dic</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-header"><h3>Actividad reciente</h3></div>
+            <div id="dashboard-actividad"><div style="padding:20px;color:#888;">Cargando...</div></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header"><h3>Alertas</h3></div>
+            <div id="dashboard-alertas"><div style="padding:20px;color:#888;">Cargando...</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ PAGE: EQUIPOS / MAQUINAS ============ -->
+      <div id="page-equipos" class="page">
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Maquinas y Activos</h3>
+            <div class="actions">
+              <input type="text" class="search-input" placeholder="Buscar maquina...">
+              <button class="btn btn-primary" onclick="abrirModalEquipo()">+ Nueva Maquina</button>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Maquina</th>
+                <th>Componentes</th>
+                <th>Ubicacion</th>
+                <th>Estado</th>
+                <th>Ultimo Mant.</th>
+                <th>Proximo</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="equipos-tbody">
+              <tr><td colspan="7" style="text-align:center;color:#888;padding:20px;">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ============ PAGE: REGISTROS DE MANTENIMIENTO ============ -->
+      <div id="page-ordenes" class="page">
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Registros de Mantenimiento</h3>
+            <div class="actions">
+              <input type="text" class="search-input" placeholder="Buscar por maquina o tecnico...">
+              <select class="search-input" style="width:auto;">
+                <option>Todos los tipos</option>
+                <option>Preventivo</option>
+                <option>Correctivo</option>
+                <option>Predictivo</option>
+                <option>Emergencia</option>
+              </select>
+              <button class="btn btn-primary" onclick="abrirModalRegistro()">+ Nuevo Registro</button>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha / Hora</th>
+                <th>Maquina</th>
+                <th>Tipo</th>
+                <th>Componentes</th>
+                <th>Repuestos</th>
+                <th>Tecnico</th>
+                <th>Registrado por</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="registros-tbody">
+              <tr><td colspan="8" style="text-align:center;color:#888;padding:20px;">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ============ PAGE: REPUESTOS CATEGORIZADOS ============ -->
+      <div id="page-repuestos" class="page">
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Inventario de Repuestos</h3>
+            <div class="actions">
+              <input type="text" class="search-input" placeholder="Buscar repuesto...">
+              <button class="btn btn-primary" onclick="document.getElementById('modal-repuesto').classList.add('show')">+ Nuevo Repuesto</button>
+            </div>
+          </div>
+
+          <div id="repuestos-container"><div style="padding:20px;color:#888;">Cargando...</div></div>
+        </div>
+      </div>
+
+      <!-- ============ PAGE: USUARIOS ============ -->
+      <div id="page-usuarios" class="page">
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Tecnicos y Usuarios</h3>
+            <div class="actions">
+              <button class="btn btn-primary">+ Nuevo Usuario</button>
+            </div>
+          </div>
+          <table>
+            <thead><tr><th>Nombre</th><th>Rol</th><th>Usuario</th><th>Registros este mes</th><th>Estado</th></tr></thead>
+            <tbody id="usuarios-tbody">
+              <tr><td colspan="5" style="text-align:center;color:#888;padding:20px;">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Nueva / Editar Maquina -->
+<div class="modal-overlay" id="modal-equipo">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-equipo-title">Nueva Maquina</h3>
+      <button class="modal-close" onclick="cerrarModalEquipo()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Nombre de la maquina</label>
+        <input type="text" id="eq-nombre" placeholder="Ej: Maquina Grande - Linea 1">
+      </div>
+      <div class="form-group">
+        <label>Codigo / ID</label>
+        <input type="text" id="eq-id" placeholder="Ej: MAQ-006">
+      </div>
+      <div class="form-group">
+        <label>Ubicacion</label>
+        <input type="text" id="eq-ubicacion" placeholder="Ej: Planta Principal - Nave 2">
+      </div>
+      <div class="form-group">
+        <label>Componentes (separados por coma)</label>
+        <input type="text" id="eq-componentes" placeholder="Ej: Turbina, Motor, Correa, Ventilador, Rodamientos">
+      </div>
+      <div class="form-group">
+        <label>Frecuencia de mantenimiento</label>
+        <select id="eq-frecuencia">
+          <option>Mensual</option>
+          <option>Bimestral</option>
+          <option selected>Trimestral</option>
+          <option>Semestral</option>
+          <option>Anual</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="cerrarModalEquipo()">Cancelar</button>
+      <button class="btn btn-primary" id="btn-guardar-equipo" onclick="guardarMaquina()">Guardar y generar QR</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Nuevo Repuesto -->
+<div class="modal-overlay" id="modal-repuesto">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Nuevo Repuesto</h3>
+      <button class="modal-close" onclick="document.getElementById('modal-repuesto').classList.remove('show')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Codigo</label>
+        <input type="text" id="rep-codigo" placeholder="Ej: ROD-004">
+      </div>
+      <div class="form-group">
+        <label>Descripcion</label>
+        <input type="text" id="rep-descripcion" placeholder="Ej: Rodamiento 6208-2RS SKF">
+      </div>
+      <div class="form-group">
+        <label>Categoria</label>
+        <select id="rep-categoria">
+          <option>Rodamientos</option>
+          <option>Correas y Transmision</option>
+          <option>Ventilacion</option>
+          <option>Lubricantes</option>
+          <option>Turbina</option>
+          <option>Electricidad</option>
+          <option>Filtros</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Stock actual</label>
+        <input type="number" id="rep-stock" value="0">
+      </div>
+      <div class="form-group">
+        <label>Stock minimo (para alerta)</label>
+        <input type="number" id="rep-minimo" value="3">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="document.getElementById('modal-repuesto').classList.remove('show')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarRepuesto()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Nuevo Registro de Mantenimiento -->
+<div class="modal-overlay" id="modal-registro">
+  <div class="modal" style="width:600px;">
+    <div class="modal-header">
+      <h3>Nuevo Registro de Mantenimiento</h3>
+      <button class="modal-close" onclick="cerrarModalRegistro()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Maquina</label>
+        <select id="reg-maquina" onchange="cargarComponentesMaquina()">
+          <option value="">Seleccionar maquina...</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Tipo de mantenimiento</label>
+        <select id="reg-tipo">
+          <option>Preventivo</option>
+          <option>Correctivo</option>
+          <option>Predictivo</option>
+          <option>Emergencia</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Tecnico responsable</label>
+        <select id="reg-tecnico">
+          <option value="">Seleccionar tecnico...</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Componentes intervenidos</label>
+        <div id="reg-componentes-list"></div>
+        <button class="btn-add-sm" onclick="addRegistroComponente()">+ Agregar componente</button>
+      </div>
+      <div class="form-group">
+        <label>Observaciones</label>
+        <textarea id="reg-observaciones" rows="3" placeholder="Descripcion del trabajo realizado..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="cerrarModalRegistro()">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarRegistro()">Guardar Registro</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: QR de Maquina -->
+<div class="modal-overlay" id="modal-qr">
+  <div class="modal" style="width:480px;">
+    <div class="modal-header">
+      <h3>Codigo QR de Maquina</h3>
+      <button class="modal-close" onclick="cerrarModalQR()">&times;</button>
+    </div>
+    <div class="qr-modal-body">
+      <div class="qr-maquina-name" id="qr-nombre"></div>
+      <div class="qr-maquina-id" id="qr-id"></div>
+      <div class="qr-maquina-ubicacion" id="qr-ubicacion"></div>
+      <div id="qr-canvas-container"></div>
+      <div class="qr-url" id="qr-url"></div>
+      <div class="qr-print-actions">
+        <button class="btn btn-primary" onclick="imprimirQR()">Imprimir QR</button>
+        <button class="btn btn-outline" onclick="descargarQR()">Descargar imagen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Area oculta para impresion -->
+<div id="qr-print-area" style="display:none;">
+  <div class="qr-print-sheet">
+    <div class="qr-print-title" id="qr-print-nombre"></div>
+    <div class="qr-print-id" id="qr-print-id"></div>
+    <div class="qr-print-ubicacion" id="qr-print-ubicacion"></div>
+    <canvas id="qr-print-canvas"></canvas>
+    <div class="qr-print-footer">Escanear para registrar mantenimiento - CMMS Pro</div>
+  </div>
+</div>
+
+<!-- Login overlay -->
+<div class="modal-overlay show" id="login-overlay" style="background:rgba(15,52,96,0.95);">
+  <div class="modal" style="width:360px;">
+    <div class="modal-header"><h3>Iniciar Sesion - CMMS Pro</h3></div>
+    <div class="modal-body">
+      <div class="form-group"><label>Usuario</label><input type="text" id="login-id" placeholder="Ej: admin"></div>
+      <div class="form-group"><label>PIN</label><input type="password" id="login-pin" placeholder="****"></div>
+      <div id="login-error" style="color:#dc3545;font-size:13px;display:none;"></div>
+      <!-- DEV ONLY - NO SUBIR A PRODUCCION -->
+      <div id="dev-quick-login" style="margin-top:16px;padding-top:14px;border-top:2px dashed #ffc107;">
+        <div style="font-size:11px;font-weight:700;color:#856404;background:#fff3cd;padding:4px 8px;border-radius:4px;text-align:center;margin-bottom:10px;">DEV ONLY - Quick Login</div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <button class="btn" style="background:#0f3460;color:white;width:100%;font-size:12px;" onclick="quickLogin('admin','1234')">Admin (admin / 1234)</button>
+          <button class="btn" style="background:#1a5276;color:white;width:100%;font-size:12px;" onclick="quickLogin('data-entry1','1111')">Maciel - Data Entry (1111)</button>
+          <button class="btn" style="background:#2d6a8f;color:white;width:100%;font-size:12px;" onclick="quickLogin('tecnico1','2222')">Juan Perez - Tecnico (2222)</button>
+        </div>
+      </div>
+      <!-- /DEV ONLY -->
+    </div>
+    <div class="modal-footer"><button class="btn btn-primary" style="width:100%;" onclick="doLogin()">Entrar</button></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script>
+const API_BASE = 'http://localhost:8080/api';
+let currentUser = JSON.parse(localStorage.getItem('cmms_user') || 'null');
+let currentPin = localStorage.getItem('cmms_pin') || '';
+
+function authHeaders() {
+  return { 'X-User-ID': currentUser?.id || '', 'X-Pin': currentPin };
+}
+
+async function api(path, opts = {}) {
+  const headers = { ...authHeaders(), ...opts.headers };
+  if (opts.body) headers['Content-Type'] = 'application/json';
+  const res = await fetch(API_BASE + path, { ...opts, headers });
+  if (res.status === 401) { logout(); return null; }
+  return res.json();
+}
+
+// Login
+async function doLogin() {
+  const id = document.getElementById('login-id').value.trim();
+  const pin = document.getElementById('login-pin').value.trim();
+  const errEl = document.getElementById('login-error');
+  if (!id || !pin) { errEl.textContent = 'Complete ambos campos'; errEl.style.display = 'block'; return; }
+
+  const res = await fetch(API_BASE + '/auth/login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, pin })
+  });
+  if (!res.ok) { errEl.textContent = 'Credenciales invalidas'; errEl.style.display = 'block'; return; }
+
+  currentUser = await res.json();
+  currentPin = pin;
+  localStorage.setItem('cmms_user', JSON.stringify(currentUser));
+  localStorage.setItem('cmms_pin', pin);
+  document.getElementById('login-overlay').classList.remove('show');
+  document.getElementById('topbar-user').textContent = currentUser.nombre;
+  document.getElementById('topbar-avatar').textContent = currentUser.nombre.slice(0, 2).toUpperCase();
+  loadDashboard();
+}
+
+function logout() {
+  currentUser = null; currentPin = '';
+  localStorage.removeItem('cmms_user'); localStorage.removeItem('cmms_pin');
+  document.getElementById('login-overlay').classList.add('show');
+}
+
+// Check session on load
+if (currentUser) {
+  document.getElementById('login-overlay').classList.remove('show');
+  document.getElementById('topbar-user').textContent = currentUser.nombre;
+  document.getElementById('topbar-avatar').textContent = currentUser.nombre.slice(0, 2).toUpperCase();
+  loadDashboard();
+}
+
+function quickLogin(id, pin) {
+  document.getElementById('login-id').value = id;
+  document.getElementById('login-pin').value = pin;
+  doLogin();
+}
+
+document.getElementById('login-pin').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+// Navigation
+const pageLoaders = { dashboard: loadDashboard, equipos: loadEquipos, ordenes: loadRegistros, repuestos: loadRepuestos, usuarios: loadUsuarios };
+
+function showPage(page, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.sidebar a').forEach(a => a.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  if (el) el.classList.add('active');
+  const titles = { dashboard:'Dashboard', equipos:'Maquinas / Activos', ordenes:'Registros de Mantenimiento', repuestos:'Inventario de Repuestos', usuarios:'Tecnicos & Usuarios' };
+  document.getElementById('page-title').textContent = titles[page] || 'Dashboard';
+  if (pageLoaders[page]) pageLoaders[page]();
+}
+
+// Dashboard
+async function loadDashboard() {
+  const [stats, alertas, actividad] = await Promise.all([
+    api('/dashboard/stats'), api('/dashboard/alertas'), api('/dashboard/actividad')
+  ]);
+  if (!stats) return;
+
+  document.getElementById('stat-maquinas').textContent = stats.maquinas_activas;
+  document.getElementById('stat-pendientes').textContent = stats.mantenimientos_pendientes;
+  document.getElementById('stat-vencidos').textContent = stats.maquinas_vencidas + ' vencidos';
+  document.getElementById('stat-registros').textContent = stats.registros_este_mes;
+  document.getElementById('stat-stockbajo').textContent = stats.repuestos_stock_bajo;
+
+  // Actividad
+  const actDiv = document.getElementById('dashboard-actividad');
+  if (actividad && actividad.length) {
+    actDiv.innerHTML = actividad.map(a => `
+      <div class="activity-item">
+        <div class="activity-dot mant"></div>
+        <div>
+          <div class="activity-text"><strong>${a.tecnico_nombre}</strong> registro ${a.tipo.toLowerCase()} en <strong>${a.maquina_nombre}</strong> — ${a.componentes} comp., ${a.repuestos} rep.</div>
+          <div class="activity-time">${a.fecha}</div>
+        </div>
+      </div>`).join('');
+  } else { actDiv.innerHTML = '<div style="padding:20px;color:#888;">Sin actividad reciente</div>'; }
+
+  // Alertas
+  const alDiv = document.getElementById('dashboard-alertas');
+  if (alertas && alertas.length) {
+    alDiv.innerHTML = alertas.map(a => `
+      <div class="alert-item">
+        <div class="alert-icon ${a.tipo === 'mantenimiento_vencido' ? 'danger' : 'warning'}">!</div>
+        <div><div class="alert-text">${a.descripcion}</div></div>
+      </div>`).join('');
+  } else { alDiv.innerHTML = '<div style="padding:20px;color:#888;">Sin alertas</div>'; }
+}
+
+// Equipos
+async function loadEquipos() {
+  const maquinas = await api('/maquinas');
+  if (!maquinas) return;
+  const tbody = document.getElementById('equipos-tbody');
+  tbody.innerHTML = maquinas.map(m => {
+    const comps = m.componentes || [];
+    const shown = comps.slice(0, 3).map(c => `<span class="comp-chip-sm">${c.nombre}</span>`).join('');
+    const extra = comps.length > 3 ? `<span class="comp-chip-sm">+${comps.length - 3}</span>` : '';
+    const badgeClass = m.estado === 'Operativo' ? 'badge-green' : m.estado === 'Mant. vencido' ? 'badge-red' : 'badge-yellow';
+    const proxStyle = m.estado === 'Mant. vencido' ? 'color:#dc3545;font-weight:600;' : '';
+    const fmtDate = d => d ? d.split('-').reverse().join('/') : '-';
+    return `<tr>
+      <td><strong>${m.nombre}</strong><br><span style="font-size:12px;color:#888;">${m.id}</span></td>
+      <td><div class="comp-list-inline">${shown}${extra}</div></td>
+      <td>${m.ubicacion}</td>
+      <td><span class="badge ${badgeClass}">${m.estado}</span></td>
+      <td>${fmtDate(m.ultimo_mantenimiento)}</td>
+      <td style="${proxStyle}">${fmtDate(m.proximo_mantenimiento)}</td>
+      <td>
+        <button class="btn btn-outline btn-sm" onclick='editarMaquina(${JSON.stringify(m).replace(/'/g,"&#39;")})'>Editar</button>
+        <button class="btn btn-outline btn-sm" style="margin-left:4px;" onclick='abrirModalQR(${JSON.stringify({id:m.id,nombre:m.nombre,ubicacion:m.ubicacion}).replace(/'/g,"&#39;")})'>QR</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// Registros
+async function loadRegistros() {
+  const registros = await api('/registros');
+  if (!registros) return;
+  const tbody = document.getElementById('registros-tbody');
+  if (!registros.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888;padding:20px;">Sin registros</td></tr>'; return; }
+  tbody.innerHTML = registros.map(r => {
+    const comps = (r.componentes || []).map(c => `<span class="comp-chip-sm">${c.componente_nombre}</span>`).join('');
+    const repCount = (r.componentes || []).reduce((sum, c) => sum + (c.repuestos || []).reduce((s, rr) => s + rr.cantidad, 0), 0);
+    const tipoBadge = r.tipo === 'Preventivo' ? 'badge-blue' : r.tipo === 'Correctivo' ? 'badge-yellow' : 'badge-gray';
+    const parts = r.fecha.split(' ');
+    const fecha = parts[0].split('-').reverse().join('/');
+    const hora = parts[1] ? parts[1].slice(0,5) + 'hs' : '';
+    return `<tr>
+      <td><strong>${fecha}</strong><br><span style="color:#888;font-size:12px;">${hora}</span></td>
+      <td>${r.maquina_nombre}</td>
+      <td><span class="badge ${tipoBadge}">${r.tipo}</span></td>
+      <td><div class="comp-list-inline">${comps}</div></td>
+      <td><span class="badge badge-gray">${repCount} items</span></td>
+      <td>${r.tecnico_nombre}</td>
+      <td>${r.registrado_por_nombre}</td>
+      <td><button class="btn btn-outline btn-sm">Detalle</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// Repuestos
+const catColors = { 'Rodamientos':'#0f3460', 'Correas y Transmision':'#e94560', 'Ventilacion':'#f0a500', 'Lubricantes':'#28a745', 'Turbina':'#6c5ce7', 'Electricidad':'#00b894', 'Filtros':'#636e72' };
+
+async function loadRepuestos() {
+  const repuestos = await api('/repuestos');
+  if (!repuestos) return;
+  const container = document.getElementById('repuestos-container');
+
+  const grouped = {};
+  repuestos.forEach(r => { (grouped[r.categoria] = grouped[r.categoria] || []).push(r); });
+
+  let html = '';
+  for (const [cat, items] of Object.entries(grouped)) {
+    const color = catColors[cat] || '#888';
+    html += `<div class="cat-header"><div class="cat-dot" style="background:${color};"></div> ${cat}</div>`;
+    html += '<table><thead><tr><th>Codigo</th><th>Descripcion</th><th>Stock actual</th><th>Stock min.</th><th>Nivel</th></tr></thead><tbody>';
+    items.forEach(r => {
+      const pct = r.stock_minimo > 0 ? Math.min(100, Math.round(r.stock_actual / (r.stock_minimo * 2) * 100)) : 100;
+      let fillClass = 'ok', label = 'OK', labelColor = '#28a745';
+      if (r.stock_actual < r.stock_minimo) { fillClass = 'critical'; label = 'Bajo'; labelColor = '#dc3545'; }
+      else if (r.stock_actual <= r.stock_minimo * 1.2) { fillClass = 'low'; label = 'Medio'; labelColor = '#ffc107'; }
+      html += `<tr>
+        <td><strong>${r.codigo}</strong></td>
+        <td>${r.descripcion}</td>
+        <td>${r.stock_actual}</td>
+        <td>${r.stock_minimo}</td>
+        <td><div class="stock-bar"><div class="fill ${fillClass}" style="width:${pct}%;"></div></div> <span style="color:${labelColor};font-size:12px;${fillClass === 'critical' ? 'font-weight:600;' : ''}">${label}</span></td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+  }
+  container.innerHTML = html;
+}
+
+// Usuarios
+async function loadUsuarios() {
+  const usuarios = await api('/usuarios');
+  if (!usuarios) return;
+  const tbody = document.getElementById('usuarios-tbody');
+  tbody.innerHTML = usuarios.map(u => {
+    const rolBadge = u.rol === 'Administrador' ? 'background:#0f3460;color:white;' : u.rol === 'Data Entry' ? '' : '';
+    const rolClass = u.rol === 'Data Entry' ? 'badge-blue' : u.rol === 'Tecnico' ? 'badge-gray' : '';
+    return `<tr>
+      <td><strong>${u.nombre}</strong></td>
+      <td><span class="badge ${rolClass}" ${u.rol === 'Administrador' ? 'style="background:#0f3460;color:white;"' : ''}>${u.rol}</span></td>
+      <td>${u.id}</td>
+      <td>-</td>
+      <td><span class="badge badge-green">${u.estado}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+// Maquinas: crear / editar
+let editandoMaquinaId = null;
+
+function abrirModalEquipo() {
+  editandoMaquinaId = null;
+  document.getElementById('modal-equipo-title').textContent = 'Nueva Maquina';
+  document.getElementById('btn-guardar-equipo').textContent = 'Guardar y generar QR';
+  document.getElementById('eq-id').readOnly = false;
+  document.getElementById('eq-id').style.background = '';
+  ['eq-id','eq-nombre','eq-ubicacion','eq-componentes'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('eq-frecuencia').value = 'Trimestral';
+  document.getElementById('modal-equipo').classList.add('show');
+}
+
+function editarMaquina(m) {
+  editandoMaquinaId = m.id;
+  document.getElementById('modal-equipo-title').textContent = 'Editar Maquina';
+  document.getElementById('btn-guardar-equipo').textContent = 'Guardar cambios';
+  document.getElementById('eq-id').value = m.id;
+  document.getElementById('eq-id').readOnly = true;
+  document.getElementById('eq-id').style.background = '#f0f0f0';
+  document.getElementById('eq-nombre').value = m.nombre;
+  document.getElementById('eq-ubicacion').value = m.ubicacion;
+  document.getElementById('eq-componentes').value = (m.componentes || []).map(c => c.nombre).join(', ');
+  document.getElementById('eq-frecuencia').value = m.frecuencia_mantenimiento || 'Trimestral';
+  document.getElementById('modal-equipo').classList.add('show');
+}
+
+function cerrarModalEquipo() {
+  document.getElementById('modal-equipo').classList.remove('show');
+  editandoMaquinaId = null;
+}
+
+async function guardarMaquina() {
+  const comps = document.getElementById('eq-componentes').value.split(',').map(c => c.trim()).filter(c => c);
+  const nombre = document.getElementById('eq-nombre').value.trim();
+  const ubicacion = document.getElementById('eq-ubicacion').value.trim();
+  const frecuencia = document.getElementById('eq-frecuencia').value;
+
+  if (!nombre || !ubicacion) { alert('Complete los campos obligatorios'); return; }
+
+  if (editandoMaquinaId) {
+    // Editar existente
+    const data = { nombre, ubicacion, frecuencia_mantenimiento: frecuencia, componentes: comps };
+    const res = await api('/maquinas/' + editandoMaquinaId, { method: 'PUT', body: JSON.stringify(data) });
+    if (res && !res.error) {
+      cerrarModalEquipo();
+      loadEquipos();
+    } else { alert(res?.error || 'Error al actualizar'); }
+  } else {
+    // Crear nueva
+    const id = document.getElementById('eq-id').value.trim();
+    if (!id) { alert('Complete el Codigo / ID'); return; }
+    const data = { id, nombre, ubicacion, frecuencia_mantenimiento: frecuencia, componentes: comps };
+    const res = await api('/maquinas', { method: 'POST', body: JSON.stringify(data) });
+    if (res && !res.error) {
+      cerrarModalEquipo();
+      loadEquipos();
+    } else { alert(res?.error || 'Error al crear'); }
+  }
+}
+
+// Create repuesto
+async function guardarRepuesto() {
+  const data = {
+    codigo: document.getElementById('rep-codigo').value.trim(),
+    descripcion: document.getElementById('rep-descripcion').value.trim(),
+    categoria: document.getElementById('rep-categoria').value,
+    stock_actual: parseInt(document.getElementById('rep-stock').value) || 0,
+    stock_minimo: parseInt(document.getElementById('rep-minimo').value) || 0
+  };
+  if (!data.codigo || !data.descripcion) { alert('Complete los campos obligatorios'); return; }
+  const res = await api('/repuestos', { method: 'POST', body: JSON.stringify(data) });
+  if (res && !res.error) {
+    document.getElementById('modal-repuesto').classList.remove('show');
+    ['rep-codigo','rep-descripcion'].forEach(id => document.getElementById(id).value = '');
+    loadRepuestos();
+  } else { alert(res?.error || 'Error al crear'); }
+}
+
+// =========== Registro de Mantenimiento ===========
+let regMaquinas = [], regRepuestos = [], regCompCounter = 0;
+
+async function abrirModalRegistro() {
+  regCompCounter = 0;
+  document.getElementById('reg-componentes-list').innerHTML = '';
+  document.getElementById('reg-observaciones').value = '';
+
+  const [maquinas, usuarios, repuestos] = await Promise.all([
+    api('/maquinas'), api('/usuarios'), api('/repuestos')
+  ]);
+  if (!maquinas) return;
+
+  regMaquinas = maquinas;
+  regRepuestos = repuestos || [];
+
+  // Poblar select de maquinas
+  const selMaq = document.getElementById('reg-maquina');
+  selMaq.innerHTML = '<option value="">Seleccionar maquina...</option>' +
+    maquinas.map(m => `<option value="${m.id}">${m.nombre} (${m.id})</option>`).join('');
+
+  // Poblar select de tecnicos
+  const selTec = document.getElementById('reg-tecnico');
+  const tecnicos = (usuarios || []).filter(u => u.rol === 'Tecnico' || u.rol === 'Administrador');
+  selTec.innerHTML = '<option value="">Seleccionar tecnico...</option>' +
+    tecnicos.map(u => `<option value="${u.id}">${u.nombre}</option>`).join('');
+
+  document.getElementById('modal-registro').classList.add('show');
+}
+
+function cerrarModalRegistro() {
+  document.getElementById('modal-registro').classList.remove('show');
+}
+
+function cargarComponentesMaquina() {
+  regCompCounter = 0;
+  document.getElementById('reg-componentes-list').innerHTML = '';
+}
+
+function getComponentesMaquinaActual() {
+  const maqId = document.getElementById('reg-maquina').value;
+  const maq = regMaquinas.find(m => m.id === maqId);
+  return maq?.componentes || [];
+}
+
+function addRegistroComponente() {
+  const comps = getComponentesMaquinaActual();
+  if (!document.getElementById('reg-maquina').value) { alert('Seleccione una maquina primero'); return; }
+  if (!comps.length) { alert('La maquina no tiene componentes cargados'); return; }
+
+  const idx = regCompCounter++;
+  const div = document.createElement('div');
+  div.className = 'registro-comp-block';
+  div.id = `reg-comp-${idx}`;
+  div.innerHTML = `
+    <div class="block-header">
+      <strong>Componente #${idx + 1}</strong>
+      <button class="btn-remove" onclick="document.getElementById('reg-comp-${idx}').remove()">&times;</button>
+    </div>
+    <div class="form-row">
+      <select id="reg-comp-sel-${idx}">
+        ${comps.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('')}
+      </select>
+    </div>
+    <div id="reg-comp-reps-${idx}"></div>
+    <button class="btn-add-sm" onclick="addRegistroRepuesto(${idx})">+ Agregar repuesto</button>
+  `;
+  document.getElementById('reg-componentes-list').appendChild(div);
+}
+
+let repCounters = {};
+function addRegistroRepuesto(compIdx) {
+  if (!repCounters[compIdx]) repCounters[compIdx] = 0;
+  const repIdx = repCounters[compIdx]++;
+  const div = document.createElement('div');
+  div.className = 'registro-rep-item';
+  div.id = `reg-rep-${compIdx}-${repIdx}`;
+  div.innerHTML = `
+    <select>
+      ${regRepuestos.map(r => `<option value="${r.codigo}">${r.codigo} - ${r.descripcion}</option>`).join('')}
+    </select>
+    <input type="number" value="1" min="1" placeholder="Cant.">
+    <button class="btn-remove" onclick="document.getElementById('reg-rep-${compIdx}-${repIdx}').remove()">&times;</button>
+  `;
+  document.getElementById(`reg-comp-reps-${compIdx}`).appendChild(div);
+}
+
+async function guardarRegistro() {
+  const maquinaId = document.getElementById('reg-maquina').value;
+  const tipo = document.getElementById('reg-tipo').value;
+  const tecnicoId = document.getElementById('reg-tecnico').value;
+  const observaciones = document.getElementById('reg-observaciones').value.trim();
+
+  if (!maquinaId) { alert('Seleccione una maquina'); return; }
+  if (!tecnicoId) { alert('Seleccione un tecnico'); return; }
+
+  // Recolectar componentes y repuestos
+  const componentes = [];
+  document.querySelectorAll('.registro-comp-block').forEach(block => {
+    const compSelect = block.querySelector('select[id^="reg-comp-sel-"]');
+    const repuestos = [];
+    block.querySelectorAll('.registro-rep-item').forEach(repItem => {
+      const repSel = repItem.querySelector('select');
+      const cantInput = repItem.querySelector('input');
+      if (repSel.value) {
+        repuestos.push({ repuesto_codigo: repSel.value, cantidad: parseInt(cantInput.value) || 1 });
+      }
+    });
+    componentes.push({ componente_id: parseInt(compSelect.value), repuestos });
+  });
+
+  if (!componentes.length) { alert('Agregue al menos un componente'); return; }
+
+  const now = new Date();
+  const fecha = now.toISOString().slice(0, 10) + ' ' + now.toTimeString().slice(0, 5);
+  const data = {
+    maquina_id: maquinaId,
+    fecha,
+    tipo,
+    tecnico_id: tecnicoId,
+    registrado_por_id: currentUser.id,
+    observaciones: observaciones || null,
+    componentes
+  };
+
+  const res = await api('/registros', { method: 'POST', body: JSON.stringify(data) });
+  if (res && !res.error) {
+    cerrarModalRegistro();
+    repCounters = {};
+    loadRegistros();
+  } else { alert(res?.error || 'Error al crear registro'); }
+}
+
+// =========== QR Code ===========
+let qrMaquinaActual = null;
+
+function generarQREnCanvas(container, url, size) {
+  container.innerHTML = '';
+  const qr = qrcode(0, 'M');
+  qr.addData(url);
+  qr.make();
+  const moduleCount = qr.getModuleCount();
+  const cellSize = Math.floor(size / moduleCount);
+  const canvas = document.createElement('canvas');
+  canvas.width = cellSize * moduleCount;
+  canvas.height = cellSize * moduleCount;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#000000';
+  for (let row = 0; row < moduleCount; row++) {
+    for (let col = 0; col < moduleCount; col++) {
+      if (qr.isDark(row, col)) {
+        ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+      }
+    }
+  }
+  container.appendChild(canvas);
+  return canvas;
+}
+
+function getQRUrl(maquinaId) {
+  return window.location.origin + window.location.pathname.replace('backoffice.html', 'qr.html') + '?maquina=' + encodeURIComponent(maquinaId);
+}
+
+function abrirModalQR(m) {
+  qrMaquinaActual = m;
+  document.getElementById('qr-nombre').textContent = m.nombre;
+  document.getElementById('qr-id').textContent = m.id;
+  document.getElementById('qr-ubicacion').textContent = m.ubicacion;
+
+  const url = getQRUrl(m.id);
+  document.getElementById('qr-url').textContent = url;
+
+  generarQREnCanvas(document.getElementById('qr-canvas-container'), url, 250);
+
+  document.getElementById('modal-qr').classList.add('show');
+}
+
+function cerrarModalQR() {
+  document.getElementById('modal-qr').classList.remove('show');
+  qrMaquinaActual = null;
+}
+
+function imprimirQR() {
+  if (!qrMaquinaActual) return;
+  const m = qrMaquinaActual;
+  const url = getQRUrl(m.id);
+
+  document.getElementById('qr-print-nombre').textContent = m.nombre;
+  document.getElementById('qr-print-id').textContent = m.id;
+  document.getElementById('qr-print-ubicacion').textContent = m.ubicacion;
+
+  // Generar QR mas grande para impresion
+  const printContainer = document.getElementById('qr-print-canvas').parentElement;
+  const oldCanvas = document.getElementById('qr-print-canvas');
+  if (oldCanvas) oldCanvas.remove();
+
+  const qr = qrcode(0, 'M');
+  qr.addData(url);
+  qr.make();
+  const moduleCount = qr.getModuleCount();
+  const cellSize = Math.floor(320 / moduleCount);
+  const canvas = document.createElement('canvas');
+  canvas.id = 'qr-print-canvas';
+  canvas.width = cellSize * moduleCount;
+  canvas.height = cellSize * moduleCount;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#000000';
+  for (let row = 0; row < moduleCount; row++) {
+    for (let col = 0; col < moduleCount; col++) {
+      if (qr.isDark(row, col)) ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+    }
+  }
+  const footer = printContainer.querySelector('.qr-print-footer');
+  printContainer.insertBefore(canvas, footer);
+
+  document.getElementById('qr-print-area').style.display = 'flex';
+  window.print();
+  document.getElementById('qr-print-area').style.display = 'none';
+}
+
+function descargarQR() {
+  if (!qrMaquinaActual) return;
+  const canvas = document.querySelector('#qr-canvas-container canvas');
+  if (!canvas) return;
+  const link = document.createElement('a');
+  link.download = `QR-${qrMaquinaActual.id}.png`;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+</script>
+</body>
+</html>
