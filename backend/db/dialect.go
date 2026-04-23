@@ -6,6 +6,7 @@ import (
 	"log"
 
 	_ "github.com/microsoft/go-mssqldb"
+	_ "github.com/tursodatabase/libsql-client-go/libsql"
 	_ "modernc.org/sqlite"
 )
 
@@ -123,20 +124,30 @@ func (d Dialect) InsertAndGetIDSingle(db *sql.DB, query string, args ...interfac
 }
 
 func Connect(driver, connString string) (*sql.DB, Dialect) {
-	dialect := Dialect{Type: DialectType(driver)}
+	// Turso uses libsql driver but SQLite-compatible SQL
+	dialectType := DialectType(driver)
+	if driver == "turso" {
+		dialectType = SQLite
+	}
+	dialect := Dialect{Type: dialectType}
 
 	var d *sql.DB
 	var err error
 
-	if dialect.Type == SQLite {
+	switch driver {
+	case "turso":
+		d, err = sql.Open("libsql", connString)
+		if err != nil {
+			log.Fatalf("Error opening Turso: %v", err)
+		}
+	case "sqlite":
 		d, err = sql.Open("sqlite", connString)
 		if err != nil {
 			log.Fatalf("Error opening SQLite: %v", err)
 		}
-		// Enable WAL mode and foreign keys
 		d.Exec("PRAGMA journal_mode=WAL")
 		d.Exec("PRAGMA foreign_keys=ON")
-	} else {
+	default:
 		d, err = sql.Open("sqlserver", connString)
 		if err != nil {
 			log.Fatalf("Error opening SQL Server: %v", err)

@@ -29,6 +29,11 @@ func main() {
 	r := gin.Default()
 	r.Use(middleware.CORS(cfg.CORSOrigin))
 
+	// Serve static frontend files
+	r.StaticFile("/", "./static/backoffice.html")
+	r.StaticFile("/backoffice.html", "./static/backoffice.html")
+	r.StaticFile("/qr.html", "./static/qr.html")
+
 	// Handlers
 	maquinaH := &handlers.MaquinaHandler{DB: database, D: dialect}
 	repuestoH := &handlers.RepuestoHandler{DB: database, D: dialect}

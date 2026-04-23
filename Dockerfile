@@ -1,10 +1,10 @@
 FROM golang:1.23-alpine AS builder
 
 WORKDIR /app
-COPY go.mod go.sum ./
+COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 
-COPY . .
+COPY backend/ .
 RUN CGO_ENABLED=0 GOOS=linux go build -o server .
 
 FROM alpine:3.19
@@ -13,7 +13,9 @@ WORKDIR /app
 COPY --from=builder /app/server .
 
 # Copy frontend static files
-COPY --from=builder /app/static ./static
+RUN mkdir -p static
+COPY backoffice.html ./static/
+COPY qr.html ./static/
 
 EXPOSE 8080
 CMD ["./server"]
