@@ -641,3 +641,39 @@ test.describe('Eliminar maquina', () => {
     await requestPromise;
   });
 });
+
+// ---------------------------------------------------------------------------
+// 12. Checklist preventivo en modal de registro
+// ---------------------------------------------------------------------------
+
+test.describe('Checklist en modal registro', () => {
+  test('elegir maquina con tareas y tipo Preventivo muestra el checklist', async ({ page }) => {
+    await openBackoffice(page);
+    await page.click('text=Registros de Mant.');
+    await page.click('button:has-text("+ Nuevo Registro")');
+    await page.selectOption('#reg-maquina', 'MAQ-001');
+    await expect(page.locator('#reg-seccion-tareas')).toBeVisible();
+    await expect(page.locator('#reg-tareas-list .tarea-card')).toHaveCount(2);
+    await page.selectOption('#reg-tipo', 'Correctivo');
+    await expect(page.locator('#reg-seccion-tareas')).toBeHidden();
+  });
+
+  test('guardar con checklist tildado manda tareas en el payload', async ({ page }) => {
+    await openBackoffice(page);
+    await page.click('text=Registros de Mant.');
+    await page.click('button:has-text("+ Nuevo Registro")');
+    await page.selectOption('#reg-maquina', 'MAQ-001');
+    await page.selectOption('#reg-tecnico', 'tec01');
+    const card = page.locator('#reg-tareas-list .tarea-card[data-tarea-id="1"]');
+    await card.locator('.chip-res', { hasText: 'Realizado' }).last().click();
+
+    const requestPromise = page.waitForRequest(
+      (req) => req.url().endsWith('/api/registros') && req.method() === 'POST'
+    );
+    await page.click('#modal-registro button:has-text("Guardar Registro")');
+    const req = await requestPromise;
+    const payload = JSON.parse(req.postData() || '{}');
+    expect(payload.tareas).toEqual([{ tarea_id: 1, resultados: ['Realizado'], observacion: null }]);
+    expect(payload.componentes).toEqual([]);
+  });
+});

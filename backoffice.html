@@ -183,6 +183,15 @@
   }
 
   @media (max-width: 1200px) { .stats { grid-template-columns: repeat(2, 1fr); } .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+/* Checklist preventivo en modal de registro */
+.tarea-card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; background: #fafbfc; }
+.tarea-card .tarea-nombre { font-size: 13px; font-weight: 700; color: #0f3460; }
+.tarea-card .tarea-desc { font-size: 12px; color: #888; }
+.tarea-card .tarea-meta { font-size: 11px; color: #888; white-space: nowrap; }
+.chips-res { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.chip-res { padding: 5px 10px; border-radius: 16px; border: 1.5px solid #e2e8f0; background: white; color: #555; font-size: 12px; font-weight: 600; cursor: pointer; user-select: none; }
+.chip-res.sel { background: #0f3460; border-color: #0f3460; color: white; }
+.tarea-card .tarea-obs { width: 100%; margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -661,7 +670,7 @@
       </div>
       <div class="form-group">
         <label>Tipo de mantenimiento</label>
-        <select id="reg-tipo">
+        <select id="reg-tipo" onchange="regToggleTareas()">
           <option>Preventivo</option>
           <option>Correctivo</option>
           <option>Predictivo</option>
@@ -688,6 +697,10 @@
       <div class="form-group">
         <label>Fecha proximo mantenimiento (estimada)</label>
         <input type="date" id="reg-proximo">
+      </div>
+      <div class="form-group" id="reg-seccion-tareas" style="display:none;">
+        <label>Checklist preventivo <span style="font-weight:400;color:#888;">(tildar lo que se hizo, puede ser mas de una opcion)</span></label>
+        <div id="reg-tareas-list"></div>
       </div>
       <div class="form-group">
         <label>Componentes intervenidos</label>
@@ -1473,6 +1486,9 @@ async function abrirModalRegistro() {
   // Poblar select de tecnicos
   poblarTecnicos(usuarios || []);
   document.getElementById('reg-nueva-persona').style.display = 'none';
+  regTareas = [];
+  regRenderTareas();
+  regToggleTareas();
   document.getElementById('modal-registro').classList.add('show');
 }
 
@@ -1511,6 +1527,44 @@ function cerrarModalRegistro() {
 function cargarComponentesMaquina() {
   regCompCounter = 0;
   document.getElementById('reg-componentes-list').innerHTML = '';
+  regCargarTareas();
+}
+
+// Checklist preventivo dentro del modal (mismo comportamiento que qr.html)
+let regTareas = [];
+const REG_RESULTADOS = ['No realizado', 'Realizado', 'Ajustado', 'Sustituido', 'Observado'];
+const REG_TAREA_BADGES = { vencida: 'Vencida', nunca: 'Nunca hecha', proxima: 'Proxima', ok: 'Al dia' };
+
+async function regCargarTareas() {
+  const maqId = document.getElementById('reg-maquina').value;
+  regTareas = maqId ? (await api('/maquinas/' + encodeURIComponent(maqId) + '/tareas')) || [] : [];
+  regRenderTareas();
+  regToggleTareas();
+}
+
+function regToggleTareas() {
+  const visible = regTareas.length && document.getElementById('reg-tipo').value === 'Preventivo';
+  document.getElementById('reg-seccion-tareas').style.display = visible ? '' : 'none';
+}
+
+function regRenderTareas() {
+  document.getElementById('reg-tareas-list').innerHTML = regTareas.map(t => `
+    <div class="tarea-card" data-tarea-id="${t.id}">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;">
+        <div>
+          <div class="tarea-nombre">${t.nombre}</div>
+          ${t.descripcion ? `<div class="tarea-desc">${t.descripcion}</div>` : ''}
+        </div>
+        <div class="tarea-meta">
+          <span class="badge ${t.estado === 'vencida' ? 'badge-red' : t.estado === 'proxima' ? 'badge-yellow' : t.estado === 'ok' ? 'badge-green' : 'badge-gray'}">${REG_TAREA_BADGES[t.estado] || t.estado}</span>
+          ${t.tiempo_estimado_min ? `~${t.tiempo_estimado_min} min` : ''}
+        </div>
+      </div>
+      <div class="chips-res">
+        ${REG_RESULTADOS.map(res => `<div class="chip-res" data-res="${res}" onclick="this.classList.toggle('sel')">${res}</div>`).join('')}
+      </div>
+      <input type="text" class="tarea-obs" placeholder="Observacion (opcional)...">
+    </div>`).join('');
 }
 
 function getComponentesMaquinaActual() {
@@ -1728,8 +1782,19 @@ async function guardarRegistro() {
     componentes.push({ componente_id: parseInt(compSelect.value), repuestos });
   });
 
+  // Checklist: solo cards con al menos un tilde (si la seccion esta visible)
+  const tareas = [];
+  if (document.getElementById('reg-seccion-tareas').style.display !== 'none') {
+    document.querySelectorAll('#reg-tareas-list [data-tarea-id]').forEach(card => {
+      const resultados = [...card.querySelectorAll('.chip-res.sel')].map(ch => ch.dataset.res);
+      if (!resultados.length) return;
+      const obs = card.querySelector('.tarea-obs').value.trim();
+      tareas.push({ tarea_id: parseInt(card.dataset.tareaId), resultados, observacion: obs || null });
+    });
+  }
+
   if (sinConjunto) { alert('Hay partes sin conjunto seleccionado'); return; }
-  if (!componentes.length) { alert('Agregue al menos una parte intervenida'); return; }
+  if (!componentes.length && !tareas.length) { alert('Agregue una parte intervenida o complete el checklist'); return; }
 
   const now = new Date();
   const fecha = now.toISOString().slice(0, 10) + ' ' + now.toTimeString().slice(0, 5);
@@ -1741,7 +1806,8 @@ async function guardarRegistro() {
     registrado_por_id: currentUser.id,
     proximo_mantenimiento: document.getElementById('reg-proximo').value || null,
     observaciones: observaciones || null,
-    componentes
+    componentes,
+    tareas
   };
 
   const res = await api('/registros', { method: 'POST', body: JSON.stringify(data) });
