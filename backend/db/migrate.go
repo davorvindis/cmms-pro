@@ -30,6 +30,12 @@ func Migrate(database *sql.DB, dialect Dialect) {
 
 	for _, stmt := range splitStatements(migration) {
 		if _, err := database.Exec(stmt); err != nil {
+			// SQL Server no tiene IF NOT EXISTS en CREATE TABLE/INDEX: sobre una
+			// DB existente esos statements fallan y hay que seguir de largo para
+			// que corran las migraciones nuevas y ensureColumn.
+			if isAlreadyExists(err) {
+				continue
+			}
 			log.Printf("Migration error on: %.80s...\nError: %v", stmt, err)
 			return
 		}
@@ -42,6 +48,14 @@ func Migrate(database *sql.DB, dialect Dialect) {
 		"NVARCHAR(10) NOT NULL DEFAULT 'Mecanico' CHECK (disciplina IN ('Mecanico', 'Electrico'))")
 
 	fmt.Println("Database migration completed")
+}
+
+// isAlreadyExists detecta errores benignos de re-ejecucion de DDL.
+func isAlreadyExists(err error) bool {
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "already an object named") || // mssql tabla
+		strings.Contains(msg, "already exists") || // mssql indice / sqlite
+		strings.Contains(msg, "duplicate column")
 }
 
 // ensureColumn agrega una columna a una tabla existente si todavia no esta.

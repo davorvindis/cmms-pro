@@ -59,13 +59,11 @@ func (h *TareaHandler) queryTareas(query string, args ...interface{}) ([]models.
 	tareas := []models.Tarea{}
 	for rows.Next() {
 		var t models.Tarea
-		var activa int
 		if err := rows.Scan(&t.ID, &t.MaquinaID, &t.Nombre, &t.Descripcion, &t.TiempoEstimadoMin,
-			&t.Frecuencia, &t.AsignadoID, &t.AsignadoNombre, &t.Orden, &activa,
+			&t.Frecuencia, &t.AsignadoID, &t.AsignadoNombre, &t.Orden, &t.Activa,
 			&t.UltimaEjecucion); err != nil {
 			continue
 		}
-		t.Activa = activa != 0
 		computarEstado(&t)
 		tareas = append(tareas, t)
 	}

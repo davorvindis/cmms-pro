@@ -23,10 +23,9 @@ func (h *RepuestoHandler) List(c *gin.Context) {
 	argIdx := 1
 
 	if search := c.Query("search"); search != "" {
-		p := h.D.Param(argIdx)
-		query += fmt.Sprintf(" AND (descripcion LIKE %s OR codigo LIKE %s)", p, p)
-		args = append(args, "%"+search+"%")
-		argIdx++
+		query += fmt.Sprintf(" AND (descripcion LIKE %s OR codigo LIKE %s)", h.D.Param(argIdx), h.D.Param(argIdx+1))
+		args = append(args, "%"+search+"%", "%"+search+"%")
+		argIdx += 2
 	}
 	if cat := c.Query("categoria"); cat != "" {
 		query += " AND categoria = " + h.D.Param(argIdx)
