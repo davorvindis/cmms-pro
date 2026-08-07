@@ -98,6 +98,8 @@ const FIXTURES = {
       tipo: 'Preventivo',
       tecnico_nombre: 'Carlos Gomez',
       registrado_por_nombre: 'Maciel Entry',
+      observaciones: 'Cinta lateral gastada, pedir repuesto',
+      tareas: [{ tarea_id: 1, tarea_nombre: 'Inspeccion tableros', resultados: ['Realizado', 'Ajustado'], observacion: null }],
       componentes: [
         {
           componente_nombre: 'Turbina',

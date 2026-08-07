@@ -677,3 +677,21 @@ test.describe('Checklist en modal registro', () => {
     expect(payload.componentes).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 13. Detalle de registro
+// ---------------------------------------------------------------------------
+
+test.describe('Detalle de registro', () => {
+  test('click en Detalle abre modal con observacion, checklist y componentes', async ({ page }) => {
+    await openBackoffice(page);
+    await page.click('text=Registros de Mant.');
+    await page.click('#registros-tbody button:has-text("Detalle")');
+    await expect(page.locator('#modal-detalle')).toHaveClass(/show/);
+    await expect(page.locator('#detalle-body')).toContainText('Cinta lateral gastada');
+    await expect(page.locator('#detalle-body')).toContainText('Inspeccion tableros');
+    await expect(page.locator('#detalle-body')).toContainText('Realizado, Ajustado');
+    await expect(page.locator('#detalle-body')).toContainText('Revision general');
+    await expect(page.locator('#detalle-body')).toContainText('Rodamiento 6205-2RS SKF x2');
+  });
+});

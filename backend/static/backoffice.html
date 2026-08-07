@@ -719,6 +719,20 @@
   </div>
 </div>
 
+<!-- Modal: Detalle de Registro -->
+<div class="modal-overlay" id="modal-detalle">
+  <div class="modal" style="width:560px;">
+    <div class="modal-header">
+      <h3 id="detalle-titulo">Detalle del Registro</h3>
+      <button class="modal-close" onclick="document.getElementById('modal-detalle').classList.remove('show')">&times;</button>
+    </div>
+    <div class="modal-body" id="detalle-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="document.getElementById('modal-detalle').classList.remove('show')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: QR de Maquina -->
 <div class="modal-overlay" id="modal-qr">
   <div class="modal" style="width:480px;">
@@ -941,9 +955,11 @@ async function eliminarMaquina(id) {
 }
 
 // Registros
+let registrosAll = [];
 async function loadRegistros() {
   const registros = await api('/registros');
   if (!registros) return;
+  registrosAll = registros;
   const tbody = document.getElementById('registros-tbody');
   if (!registros.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888;padding:20px;">Sin registros</td></tr>'; return; }
   tbody.innerHTML = registros.map(r => {
@@ -961,7 +977,7 @@ async function loadRegistros() {
       <td><span class="badge badge-gray">${repCount} items</span></td>
       <td>${r.tecnico_nombre}</td>
       <td>${r.registrado_por_nombre}</td>
-      <td><button class="btn btn-outline btn-sm">Detalle</button></td>
+      <td><button class="btn btn-outline btn-sm" onclick="verDetalleRegistro(${r.id})">Detalle</button></td>
     </tr>`;
   }).join('');
 }
@@ -1195,6 +1211,42 @@ function repLimpiarFiltros() {
   document.getElementById('rep-filtro-stock').value = '';
   repSyncTiles();
   renderRepuestos();
+}
+
+function verDetalleRegistro(id) {
+  const r = registrosAll.find(x => x.id === id);
+  if (!r) return;
+  const parts = r.fecha.split(' ');
+  const fecha = parts[0].split('-').reverse().join('/') + (parts[1] ? ' · ' + parts[1].slice(0, 5) + 'hs' : '');
+  const tipoBadge = r.tipo === 'Preventivo' ? 'badge-blue' : r.tipo === 'Correctivo' ? 'badge-yellow' : 'badge-gray';
+
+  const tareas = (r.tareas || []).map(t => `
+    <div class="tarea-card">
+      <div class="tarea-nombre">${t.tarea_nombre}</div>
+      <div style="font-size:12px;color:#555;margin-top:2px;">${(t.resultados || []).join(', ')}</div>
+      ${t.observacion ? `<div class="tarea-desc">Obs: ${t.observacion}</div>` : ''}
+    </div>`).join('');
+
+  const comps = (r.componentes || []).map(c => `
+    <div class="tarea-card">
+      <div class="tarea-nombre">${c.componente_nombre}</div>
+      ${c.trabajo_realizado ? `<div style="font-size:12px;color:#555;margin-top:2px;">${c.trabajo_realizado}</div>` : ''}
+      ${(c.repuestos || []).length ? `<div style="font-size:12px;color:#888;margin-top:4px;">${c.repuestos.map(rr => `${rr.repuesto_descripcion} x${rr.cantidad}${rr.referencia ? ' (' + rr.referencia + ')' : ''}`).join(' · ')}</div>` : ''}
+    </div>`).join('');
+
+  document.getElementById('detalle-titulo').textContent = `${r.maquina_nombre}`;
+  document.getElementById('detalle-body').innerHTML = `
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+      <span class="badge ${tipoBadge}">${r.tipo}</span>
+      <span style="font-size:13px;color:#555;">${fecha}</span>
+      <span style="font-size:13px;color:#888;">Tecnico: <strong>${r.tecnico_nombre}</strong> · Registro: ${r.registrado_por_nombre}</span>
+    </div>
+    ${r.proximo_mantenimiento ? `<div style="font-size:13px;color:#555;margin-bottom:10px;">Proximo mantenimiento estimado: <strong>${r.proximo_mantenimiento.split(' ')[0].split('-').reverse().join('/')}</strong></div>` : ''}
+    ${tareas ? `<div style="font-weight:700;font-size:13px;margin:10px 0 6px;color:#0f3460;">Checklist preventivo</div>${tareas}` : ''}
+    ${comps ? `<div style="font-weight:700;font-size:13px;margin:10px 0 6px;color:#0f3460;">Componentes intervenidos</div>${comps}` : ''}
+    ${r.observaciones ? `<div style="margin-top:12px;padding:10px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;font-size:13px;color:#92400e;"><strong>Observacion:</strong> ${r.observaciones}</div>` : ''}
+    ${!tareas && !comps && !r.observaciones ? '<div style="color:#888;font-size:13px;">Sin detalle cargado.</div>' : ''}`;
+  document.getElementById('modal-detalle').classList.add('show');
 }
 
 // =========== Tareas Preventivas ===========
