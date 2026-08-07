@@ -1,5 +1,5 @@
 {
-  "name": "cmms-produccion-beto",
+  "name": "cmms",
   "version": "1.0.0",
   "description": "CMMS system tests — Playwright E2E for backoffice.html and qr.html",
   "private": true,

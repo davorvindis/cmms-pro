@@ -1,6 +1,9 @@
 package config
 
-import "os"
+import (
+	"fmt"
+	"os"
+)
 
 type Config struct {
 	Port               string
@@ -25,6 +28,14 @@ func Load() Config {
 	}
 	if driver == "sqlite" && connStr == "" {
 		connStr = "./cmms.db"
+	}
+
+	// SQL Server: si no hay connection string completa, se compone desde
+	// variables separadas (la password viene de Key Vault via secretref,
+	// nunca se guarda armada en app settings).
+	if driver == "sqlserver" && connStr == "" {
+		connStr = fmt.Sprintf("server=%s;user id=%s;password=%s;database=%s;encrypt=true",
+			os.Getenv("DB_SERVER"), os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"), os.Getenv("DB_NAME"))
 	}
 
 	return Config{

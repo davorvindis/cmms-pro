@@ -14,12 +14,18 @@ var sqliteMigration string
 //go:embed migrations/001_create_tables.sql
 var sqlserverMigration string
 
+//go:embed migrations/002_tareas_sqlite.sql
+var sqliteMigration002 string
+
+//go:embed migrations/002_tareas.sql
+var sqlserverMigration002 string
+
 func Migrate(database *sql.DB, dialect Dialect) {
 	var migration string
 	if dialect.Type == SQLite {
-		migration = sqliteMigration
+		migration = sqliteMigration + "\n;\n" + sqliteMigration002
 	} else {
-		migration = sqlserverMigration
+		migration = sqlserverMigration + "\n;\n" + sqlserverMigration002
 	}
 
 	for _, stmt := range splitStatements(migration) {
@@ -29,7 +35,40 @@ func Migrate(database *sql.DB, dialect Dialect) {
 		}
 	}
 
+	// Columnas agregadas despues del release inicial: los CREATE TABLE IF NOT
+	// EXISTS no alteran tablas existentes (Turso en prod), hay que ALTERarlas.
+	ensureColumn(database, dialect, "Repuestos", "disciplina",
+		"TEXT NOT NULL DEFAULT 'Mecanico' CHECK (disciplina IN ('Mecanico', 'Electrico'))",
+		"NVARCHAR(10) NOT NULL DEFAULT 'Mecanico' CHECK (disciplina IN ('Mecanico', 'Electrico'))")
+
 	fmt.Println("Database migration completed")
+}
+
+// ensureColumn agrega una columna a una tabla existente si todavia no esta.
+func ensureColumn(database *sql.DB, dialect Dialect, table, column, sqliteDef, mssqlDef string) {
+	var count int
+	var checkQuery, alterStmt string
+	if dialect.Type == SQLite {
+		checkQuery = fmt.Sprintf("SELECT COUNT(*) FROM pragma_table_info('%s') WHERE name = '%s'", table, column)
+		alterStmt = fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, column, sqliteDef)
+	} else {
+		checkQuery = fmt.Sprintf("SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID('%s') AND name = '%s'", table, column)
+		alterStmt = fmt.Sprintf("ALTER TABLE %s ADD %s %s", table, column, mssqlDef)
+	}
+
+	if err := database.QueryRow(checkQuery).Scan(&count); err != nil {
+		log.Printf("ensureColumn %s.%s: check failed: %v", table, column, err)
+		return
+	}
+	if count > 0 {
+		return
+	}
+	if _, err := database.Exec(alterStmt); err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
+			return
+		}
+		log.Printf("ensureColumn %s.%s: alter failed: %v", table, column, err)
+	}
 }
 
 // splitStatements splits SQL text on semicolons, handling multi-line statements.

@@ -1,4 +1,4 @@
-# Produccion Beto - CMMS
+# CMMS
 
 Sistema CMMS (Gestión de Mantenimiento Computarizado) para planta industrial con registro de intervenciones via QR y backoffice administrativo.
 

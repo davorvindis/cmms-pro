@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: cmms-pro
+    name: cmms
     runtime: docker
     dockerfilePath: ./Dockerfile
     dockerContext: .

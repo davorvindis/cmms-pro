@@ -367,26 +367,35 @@ test.describe('Registros de Mantenimiento page', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('Repuestos page', () => {
-  test('renders repuesto categories as group headers', async ({ page }) => {
+  test('agrupar toggle renders categories as collapsible group headers', async ({ page }) => {
     await openBackoffice(page);
     await page.click('text=Repuestos');
+    await page.check('#rep-agrupar');
     const headers = page.locator('.cat-header');
     // Fixtures have 3 categories: Rodamientos, Correas y Transmision, Lubricantes
     await expect(headers).toHaveCount(3);
   });
 
-  test('stock OK shows ok fill class', async ({ page }) => {
+  test('stock OK shows green badge', async ({ page }) => {
     await openBackoffice(page);
     await page.click('text=Repuestos');
     // ROD-001 has stock 5, min 3 => OK
-    await expect(page.locator('.fill.ok').first()).toBeVisible();
+    await expect(page.locator('#repuestos-container .badge-green').first()).toBeVisible();
   });
 
-  test('stock below minimum shows critical fill class', async ({ page }) => {
+  test('stock below minimum shows warning badge', async ({ page }) => {
     await openBackoffice(page);
     await page.click('text=Repuestos');
-    // ROD-002 has stock 2, min 3 => critical
-    await expect(page.locator('.fill.critical').first()).toBeVisible();
+    // ROD-002 has stock 2, min 3 => Bajo
+    await expect(page.locator('#repuestos-container .badge-yellow').first()).toBeVisible();
+  });
+
+  test('search filters repuestos across codigo and descripcion', async ({ page }) => {
+    await openBackoffice(page);
+    await page.click('text=Repuestos');
+    await page.fill('#rep-buscar', 'correa');
+    await expect(page.locator('#repuestos-container tbody tr')).toHaveCount(1);
+    await expect(page.locator('#repuestos-container')).toContainText('Correa A-42 Gates');
   });
 
   test('+ Nuevo Repuesto button opens modal', async ({ page }) => {
@@ -455,5 +464,144 @@ test.describe('Usuarios page', () => {
     await page.click('text=Tecnicos & Usuarios');
     const estadoBadges = page.locator('#usuarios-tbody .badge-green');
     await expect(estadoBadges).toHaveCount(Object.keys(FIXTURES.users).length);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 9. Tareas Preventivas page
+// ---------------------------------------------------------------------------
+
+test.describe('Tareas page', () => {
+  async function openTareas(page) {
+    await openBackoffice(page);
+    await page.click('text=Tareas Preventivas');
+    await expect(page.locator('#page-tareas')).toHaveClass(/active/);
+  }
+
+  test('clicking Tareas Preventivas activates tareas page with title', async ({ page }) => {
+    await openTareas(page);
+    await expect(page.locator('#page-title')).toHaveText('Tareas Preventivas');
+  });
+
+  test('renders only active tareas by default', async ({ page }) => {
+    await openTareas(page);
+    // Fixtures: 3 tareas, 1 inactiva
+    await expect(page.locator('#tareas-tbody tr')).toHaveCount(2);
+    await expect(page.locator('#tareas-tbody')).toContainText('Inspeccion y limpieza Gral. Tableros');
+  });
+
+  test('ver inactivas checkbox shows all tareas', async ({ page }) => {
+    await openTareas(page);
+    await page.check('#tarea-ver-inactivas');
+    await expect(page.locator('#tareas-tbody tr')).toHaveCount(3);
+  });
+
+  test('tiles count estados of active tareas', async ({ page }) => {
+    await openTareas(page);
+    await expect(page.locator('#tarea-tile-vencida')).toHaveText('1');
+    await expect(page.locator('#tarea-tile-nunca')).toHaveText('1');
+    await expect(page.locator('#tarea-tile-ok')).toHaveText('0');
+  });
+
+  test('maquina filter reduces rows', async ({ page }) => {
+    await openTareas(page);
+    await page.selectOption('#tarea-filtro-maquina', 'MAQ-001');
+    await expect(page.locator('#tareas-tbody tr')).toHaveCount(2);
+    await page.selectOption('#tarea-filtro-maquina', 'MAQ-002');
+    // MAQ-002 solo tiene una tarea inactiva
+    await expect(page.locator('#tareas-tbody')).toContainText('Sin tareas');
+  });
+
+  test('estado badges render with correct classes', async ({ page }) => {
+    await openTareas(page);
+    await expect(page.locator('#tareas-tbody .badge-red')).toHaveText('Vencida');
+    await expect(page.locator('#tareas-tbody .badge-gray')).toHaveText('Nunca');
+  });
+
+  test('+ Nueva Tarea opens modal with frecuencia options', async ({ page }) => {
+    await openTareas(page);
+    await page.click('button:has-text("+ Nueva Tarea")');
+    await expect(page.locator('#modal-tarea')).toHaveClass(/show/);
+    await expect(page.locator('#ta-frecuencia option')).toHaveCount(7);
+  });
+
+  test('guardar tarea sends POST with full payload', async ({ page }) => {
+    await openTareas(page);
+    await page.click('button:has-text("+ Nueva Tarea")');
+    await page.selectOption('#ta-maquina', 'MAQ-001');
+    await page.fill('#ta-nombre', 'Control tablero nuevo');
+    await page.fill('#ta-tiempo', '45');
+    await page.selectOption('#ta-frecuencia', 'Trimestral');
+    await page.fill('#ta-orden', '3');
+
+    const requestPromise = page.waitForRequest(
+      (req) => req.url().endsWith('/api/tareas') && req.method() === 'POST'
+    );
+    await page.click('#modal-tarea button:has-text("Guardar")');
+    const req = await requestPromise;
+    const payload = JSON.parse(req.postData() || '{}');
+    expect(payload).toMatchObject({
+      maquina_id: 'MAQ-001',
+      nombre: 'Control tablero nuevo',
+      tiempo_estimado_min: 45,
+      frecuencia: 'Trimestral',
+      orden: 3,
+    });
+    await expect(page.locator('#modal-tarea')).not.toHaveClass(/show/);
+  });
+
+  test('editar tarea sends PUT and disables maquina select', async ({ page }) => {
+    await openTareas(page);
+    await page.click('#tareas-tbody tr >> nth=0 >> button:has-text("Editar")');
+    await expect(page.locator('#modal-tarea')).toHaveClass(/show/);
+    await expect(page.locator('#ta-maquina')).toBeDisabled();
+    await expect(page.locator('#ta-nombre')).toHaveValue('Inspeccion y limpieza Gral. Tableros');
+
+    const requestPromise = page.waitForRequest(
+      (req) => /\/api\/tareas\/1$/.test(req.url()) && req.method() === 'PUT'
+    );
+    await page.click('#modal-tarea button:has-text("Guardar")');
+    await requestPromise;
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 10. Repuestos — disciplina
+// ---------------------------------------------------------------------------
+
+test.describe('Repuestos disciplina', () => {
+  test('rows show disciplina badge', async ({ page }) => {
+    await openBackoffice(page);
+    await page.click('text=Repuestos');
+    // LUB-001 es Electrico en los fixtures
+    await expect(page.locator('#repuestos-container tr:has-text("LUB-001")')).toContainText('Electrico');
+    await expect(page.locator('#repuestos-container tr:has-text("ROD-001")')).toContainText('Mecanico');
+  });
+
+  test('disciplina filter shows only matching rows', async ({ page }) => {
+    await openBackoffice(page);
+    await page.click('text=Repuestos');
+    await page.selectOption('#rep-filtro-disc', 'Electrico');
+    await expect(page.locator('#repuestos-container tbody tr')).toHaveCount(1);
+    await expect(page.locator('#repuestos-container')).toContainText('LUB-001');
+    await page.selectOption('#rep-filtro-disc', 'Mecanico');
+    await expect(page.locator('#repuestos-container tbody tr')).toHaveCount(3);
+  });
+
+  test('nuevo repuesto POST includes disciplina', async ({ page }) => {
+    await openBackoffice(page);
+    await page.click('text=Repuestos');
+    await page.click('button:has-text("+ Nuevo Repuesto")');
+    await page.fill('#rep-codigo', 'ELE-TEST');
+    await page.fill('#rep-descripcion', 'Fotocelula de prueba');
+    await page.selectOption('#rep-disciplina', 'Electrico');
+
+    const requestPromise = page.waitForRequest(
+      (req) => req.url().endsWith('/api/repuestos') && req.method() === 'POST'
+    );
+    await page.click('#modal-repuesto button:has-text("Guardar")');
+    const req = await requestPromise;
+    const payload = JSON.parse(req.postData() || '{}');
+    expect(payload.disciplina).toBe('Electrico');
   });
 });

@@ -13,10 +13,14 @@
  *   POST /api/maquinas
  *   GET  /api/maquinas/:id
  *   GET  /api/maquinas/:id/registros
+ *   GET  /api/maquinas/:id/tareas
  *   GET  /api/registros
  *   POST /api/registros
  *   GET  /api/repuestos
  *   POST /api/repuestos
+ *   GET  /api/tareas
+ *   POST /api/tareas
+ *   PUT  /api/tareas/:id
  *   GET  /api/usuarios
  *   GET  /api/usuarios?rol=Tecnico
  */
@@ -66,10 +70,16 @@ const FIXTURES = {
   ],
 
   repuestos: [
-    { codigo: 'ROD-001', descripcion: 'Rodamiento 6205-2RS SKF', categoria: 'Rodamientos', stock_actual: 5, stock_minimo: 3 },
-    { codigo: 'ROD-002', descripcion: 'Rodamiento 6208-2RS SKF', categoria: 'Rodamientos', stock_actual: 2, stock_minimo: 3 },
-    { codigo: 'COR-001', descripcion: 'Correa A-42 Gates', categoria: 'Correas y Transmision', stock_actual: 4, stock_minimo: 2 },
-    { codigo: 'LUB-001', descripcion: 'Grasa Shell Alvania EP2', categoria: 'Lubricantes', stock_actual: 8, stock_minimo: 5 },
+    { codigo: 'ROD-001', descripcion: 'Rodamiento 6205-2RS SKF', categoria: 'Rodamientos', disciplina: 'Mecanico', stock_actual: 5, stock_minimo: 3 },
+    { codigo: 'ROD-002', descripcion: 'Rodamiento 6208-2RS SKF', categoria: 'Rodamientos', disciplina: 'Mecanico', stock_actual: 2, stock_minimo: 3 },
+    { codigo: 'COR-001', descripcion: 'Correa A-42 Gates', categoria: 'Correas y Transmision', disciplina: 'Mecanico', stock_actual: 4, stock_minimo: 2 },
+    { codigo: 'LUB-001', descripcion: 'Grasa Shell Alvania EP2', categoria: 'Lubricantes', disciplina: 'Electrico', stock_actual: 8, stock_minimo: 5 },
+  ],
+
+  tareas: [
+    { id: 1, maquina_id: 'MAQ-001', nombre: 'Inspeccion y limpieza Gral. Tableros', descripcion: null, tiempo_estimado_min: 60, frecuencia: 'Mensual', asignado_id: 'tec01', asignado_nombre: 'Carlos Gomez', orden: 1, activa: true, ultima_ejecucion: '2026-04-20 09:30', proxima_fecha: '2026-05-20', estado: 'vencida' },
+    { id: 2, maquina_id: 'MAQ-001', nombre: 'Control tablero operador', descripcion: 'botones, lamparas, torqueado', tiempo_estimado_min: 45, frecuencia: 'Mensual', asignado_id: null, asignado_nombre: null, orden: 2, activa: true, ultima_ejecucion: null, proxima_fecha: null, estado: 'nunca' },
+    { id: 3, maquina_id: 'MAQ-002', nombre: 'Inspeccion de iluminacion Gral.', descripcion: null, tiempo_estimado_min: 45, frecuencia: 'Trimestral', asignado_id: null, asignado_nombre: null, orden: 1, activa: false, ultima_ejecucion: null, proxima_fecha: null, estado: 'nunca' },
   ],
 
   dashboardStats: {
@@ -173,6 +183,27 @@ async function mockApi(page) {
   // Maquina registros (GET /maquinas/:id/registros)
   await page.route(/\/api\/maquinas\/[^/]+\/registros/, (route) =>
     route.fulfill({ contentType: 'application/json', body: JSON.stringify(FIXTURES.registros) })
+  );
+
+  // Maquina tareas (GET /maquinas/:id/tareas) — publica, solo activas
+  await page.route(/\/api\/maquinas\/([^/]+)\/tareas/, (route) => {
+    const m = route.request().url().match(/maquinas\/([^/]+)\/tareas/);
+    const items = FIXTURES.tareas.filter((t) => t.maquina_id === m[1] && t.activa);
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify(items) });
+  });
+
+  // Tareas list + create
+  await page.route(`${API}/tareas`, async (route) => {
+    if (route.request().method() === 'POST') {
+      await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ id: 99, message: 'Tarea creada' }) });
+    } else {
+      await route.fulfill({ contentType: 'application/json', body: JSON.stringify(FIXTURES.tareas) });
+    }
+  });
+
+  // Tarea update / delete
+  await page.route(/\/api\/tareas\/\d+$/, (route) =>
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'ok' }) })
   );
 
   // Registros list + create

@@ -118,11 +118,16 @@ test.describe('Spare-part category consistency', () => {
   const canonicalCategories = [
     'Rodamientos',
     'Correas y Transmision',
+    'Sellos y Retenes',
+    'Resortes',
+    'Neumatica',
+    'Cuchillas y Corte',
     'Ventilacion',
     'Lubricantes',
     'Turbina',
     'Electricidad',
     'Filtros',
+    'Mecanica General',
   ];
 
   test('catColors in backoffice.html has all canonical categories', () => {
@@ -264,5 +269,49 @@ test.describe('Frecuencia de mantenimiento options', () => {
       re.test(BACKOFFICE_SRC) ||
       BACKOFFICE_SRC.includes('<option selected>Trimestral</option>');
     expect(hasSelected).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 9. Disciplina de repuestos
+// ---------------------------------------------------------------------------
+
+test.describe('Repuestos disciplina options', () => {
+  test('rep-disciplina select has exactly Mecanico and Electrico', () => {
+    const options = extractSelectOptions(BACKOFFICE_SRC, 'rep-disciplina');
+    expect(options).toEqual(['Mecanico', 'Electrico']);
+  });
+
+  test('rep-filtro-disc filter offers both disciplinas', () => {
+    const options = extractSelectOptions(BACKOFFICE_SRC, 'rep-filtro-disc');
+    expect(options).toEqual(['Ambas disciplinas', 'Mecanico', 'Electrico']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 10. Tareas preventivas
+// ---------------------------------------------------------------------------
+
+test.describe('Tareas preventivas consistency', () => {
+  const frecuenciasTarea = ['Semanal', 'Quincenal', 'Mensual', 'Bimestral', 'Trimestral', 'Semestral', 'Anual'];
+
+  test('ta-frecuencia select in backoffice has the 7 frequency options', () => {
+    const options = extractSelectOptions(BACKOFFICE_SRC, 'ta-frecuencia');
+    expect(options.sort()).toEqual([...frecuenciasTarea].sort());
+  });
+
+  test('qr.html QR_RESULTADOS matches the 5 resultados of the paper checklist', () => {
+    // Debe coincidir con ResultadosValidos en backend/handlers/tareas.go
+    const m = QR_SRC.match(/QR_RESULTADOS\s*=\s*\[([^\]]+)\]/);
+    expect(m).not.toBeNull();
+    const values = [...(m ? m[1] : '').matchAll(/'([^']+)'/g)].map((x) => x[1]);
+    expect(values).toEqual(['No realizado', 'Realizado', 'Ajustado', 'Sustituido', 'Observado']);
+  });
+
+  test('both HTML files stay in sync with backend/static copies', () => {
+    const staticBack = fs.readFileSync(path.join(ROOT, 'backend', 'static', 'backoffice.html'), 'utf8');
+    const staticQr = fs.readFileSync(path.join(ROOT, 'backend', 'static', 'qr.html'), 'utf8');
+    expect(staticBack).toEqual(BACKOFFICE_SRC);
+    expect(staticQr).toEqual(QR_SRC);
   });
 });

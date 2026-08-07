@@ -1,4 +1,4 @@
-# CMMS Produccion - Beto
+# CMMS
 
 ## Qué es este proyecto
 Sistema CMMS (Computerized Maintenance Management System) con QR para una planta industrial.

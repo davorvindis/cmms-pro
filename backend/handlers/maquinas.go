@@ -211,24 +211,74 @@ func (h *MaquinaHandler) Delete(c *gin.Context) {
 func (h *MaquinaHandler) AddComponente(c *gin.Context) {
 	maquinaID := c.Param("id")
 	var req struct {
-		Nombre string `json:"nombre" binding:"required"`
+		Nombre  string `json:"nombre" binding:"required"`
+		Seccion string `json:"seccion"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Nombre requerido"})
 		return
 	}
 
-	query := fmt.Sprintf("INSERT INTO Componentes (nombre, maquina_id) VALUES (%s, %s)",
-		h.D.Param(1), h.D.Param(2))
+	query := fmt.Sprintf("INSERT INTO Componentes (nombre, seccion, maquina_id) VALUES (%s, %s, %s)",
+		h.D.Param(1), h.D.Param(2), h.D.Param(3))
+	if h.D.Type == db.SQLServer {
+		query = fmt.Sprintf("INSERT INTO Componentes (nombre, seccion, maquina_id) OUTPUT INSERTED.id VALUES (%s, %s, %s)",
+			h.D.Param(1), h.D.Param(2), h.D.Param(3))
+	}
 
-	result, err := h.DB.Exec(query, req.Nombre, maquinaID)
+	id, err := h.D.InsertAndGetIDSingle(h.DB, query, req.Nombre, req.Seccion, maquinaID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al agregar componente"})
 		return
 	}
 
-	id, _ := result.LastInsertId()
 	c.JSON(http.StatusCreated, gin.H{"id": id, "message": "Componente agregado"})
+}
+
+// AddComponenteRepuesto crea (si no existe) un repuesto y lo vincula al conjunto.
+// Pensado para altas rapidas durante la carga de un mantenimiento.
+func (h *MaquinaHandler) AddComponenteRepuesto(c *gin.Context) {
+	compID := c.Param("compId")
+	var req struct {
+		Codigo      string  `json:"codigo" binding:"required"`
+		Descripcion string  `json:"descripcion" binding:"required"`
+		NroHauni    *string `json:"nro_hauni"`
+		Categoria   string  `json:"categoria"`
+		Cantidad    *string `json:"cantidad"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Codigo y descripcion requeridos"})
+		return
+	}
+	if req.Categoria == "" {
+		req.Categoria = "Mecanica General"
+	}
+
+	// Alta del repuesto si no existe (si ya existe, solo se vincula)
+	var existe int
+	h.DB.QueryRow("SELECT COUNT(*) FROM Repuestos WHERE codigo = "+h.D.Param(1), req.Codigo).Scan(&existe)
+	if existe == 0 {
+		insRep := fmt.Sprintf("INSERT INTO Repuestos (codigo, descripcion, nro_hauni, categoria) VALUES (%s, %s, %s, %s)",
+			h.D.Param(1), h.D.Param(2), h.D.Param(3), h.D.Param(4))
+		if _, err := h.DB.Exec(insRep, req.Codigo, req.Descripcion, req.NroHauni, req.Categoria); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al crear repuesto", "detail": err.Error()})
+			return
+		}
+	}
+
+	var vinculado int
+	h.DB.QueryRow("SELECT COUNT(*) FROM ComponenteRepuestos WHERE componente_id = "+h.D.Param(1)+" AND repuesto_codigo = "+h.D.Param(2),
+		compID, req.Codigo).Scan(&vinculado)
+	if vinculado == 0 {
+		insLink := fmt.Sprintf("INSERT INTO ComponenteRepuestos (componente_id, repuesto_codigo, cantidad) VALUES (%s, %s, %s)",
+			h.D.Param(1), h.D.Param(2), h.D.Param(3))
+		if _, err := h.DB.Exec(insLink, compID, req.Codigo, req.Cantidad); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al vincular repuesto", "detail": err.Error()})
+			return
+		}
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"codigo": req.Codigo, "message": "Repuesto vinculado al conjunto"})
 }
 
 func (h *MaquinaHandler) DeleteComponente(c *gin.Context) {
@@ -249,7 +299,7 @@ func (h *MaquinaHandler) DeleteComponente(c *gin.Context) {
 }
 
 func (h *MaquinaHandler) getComponentes(maquinaID string) []models.Componente {
-	rows, err := h.DB.Query("SELECT id, nombre, maquina_id FROM Componentes WHERE maquina_id = "+h.D.Param(1)+" ORDER BY id", maquinaID)
+	rows, err := h.DB.Query("SELECT id, nombre, seccion, maquina_id FROM Componentes WHERE maquina_id = "+h.D.Param(1)+" ORDER BY id", maquinaID)
 	if err != nil {
 		return []models.Componente{}
 	}
@@ -258,10 +308,38 @@ func (h *MaquinaHandler) getComponentes(maquinaID string) []models.Componente {
 	comps := []models.Componente{}
 	for rows.Next() {
 		var c models.Componente
-		if err := rows.Scan(&c.ID, &c.Nombre, &c.MaquinaID); err != nil {
+		if err := rows.Scan(&c.ID, &c.Nombre, &c.Seccion, &c.MaquinaID); err != nil {
 			continue
 		}
 		comps = append(comps, c)
 	}
 	return comps
+}
+
+// ListRepuestos devuelve los repuestos que componen un conjunto segun la
+// planilla del fabricante (tabla ComponenteRepuestos).
+func (h *MaquinaHandler) ListRepuestos(c *gin.Context) {
+	compID := c.Param("compId")
+
+	query := fmt.Sprintf(`SELECT r.codigo, r.descripcion, r.nro_hauni, r.categoria, cr.cantidad
+		FROM ComponenteRepuestos cr
+		JOIN Repuestos r ON cr.repuesto_codigo = r.codigo
+		WHERE cr.componente_id = %s ORDER BY cr.id`, h.D.Param(1))
+
+	rows, err := h.DB.Query(query, compID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al listar repuestos del conjunto"})
+		return
+	}
+	defer rows.Close()
+
+	reps := []models.ComponenteRepuesto{}
+	for rows.Next() {
+		var r models.ComponenteRepuesto
+		if err := rows.Scan(&r.Codigo, &r.Descripcion, &r.NroHauni, &r.Categoria, &r.Cantidad); err != nil {
+			continue
+		}
+		reps = append(reps, r)
+	}
+	c.JSON(http.StatusOK, reps)
 }

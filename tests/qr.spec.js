@@ -534,3 +534,106 @@ test.describe('Guardar registro', () => {
     expect(payload.fecha).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 8. Checklist preventivo (tareas)
+// ---------------------------------------------------------------------------
+
+test.describe('Checklist preventivo', () => {
+  /** Abre qr.html con sesion y despliega el formulario de registro. */
+  async function openFormRegistro(page, maquinaId = 'MAQ-001') {
+    await mockApi(page);
+    await seedSession(page, 'dataEntry');
+    await page.goto(`/qr.html?maquina=${maquinaId}`);
+    await expect(page.locator('#equipo-card h2')).toBeVisible();
+    await page.click('.btn-registrar-fixed');
+    await expect(page.locator('#form-registro')).toHaveClass(/show/);
+  }
+
+  test('checklist section is visible with tipo Preventivo (default)', async ({ page }) => {
+    await openFormRegistro(page);
+    await expect(page.locator('#qr-seccion-tareas')).toBeVisible();
+    // MAQ-001 tiene 2 tareas activas en los fixtures
+    await expect(page.locator('#qr-tareas-list .tarea-card')).toHaveCount(2);
+  });
+
+  test('changing tipo to Correctivo hides the checklist, back to Preventivo shows it', async ({ page }) => {
+    await openFormRegistro(page);
+    await page.selectOption('#qr-reg-tipo', 'Correctivo');
+    await expect(page.locator('#qr-seccion-tareas')).toBeHidden();
+    await page.selectOption('#qr-reg-tipo', 'Preventivo');
+    await expect(page.locator('#qr-seccion-tareas')).toBeVisible();
+  });
+
+  test('tarea card shows estado badge and tiempo estimado', async ({ page }) => {
+    await openFormRegistro(page);
+    const card = page.locator('.tarea-card[data-tarea-id="1"]');
+    await expect(card.locator('.tarea-badge')).toHaveText('Vencida');
+    await expect(card).toContainText('~60 min');
+  });
+
+  test('each tarea card offers the 5 resultado chips, multi-toggle', async ({ page }) => {
+    await openFormRegistro(page);
+    const card = page.locator('.tarea-card[data-tarea-id="1"]');
+    await expect(card.locator('.chip-res')).toHaveCount(5);
+    const realizado = card.locator('.chip-res', { hasText: 'Realizado' }).last();
+    const ajustado = card.locator('.chip-res', { hasText: 'Ajustado' });
+    await realizado.click();
+    await ajustado.click();
+    await expect(card.locator('.chip-res.sel')).toHaveCount(2);
+    await realizado.click();
+    await expect(card.locator('.chip-res.sel')).toHaveCount(1);
+  });
+
+  test('submit with checklist only sends tareas in payload', async ({ page }) => {
+    await openFormRegistro(page);
+    await page.selectOption('#qr-reg-tecnico', 'tec01');
+    const card = page.locator('.tarea-card[data-tarea-id="1"]');
+    await card.locator('.chip-res', { hasText: 'Realizado' }).last().click();
+    await card.locator('.chip-res', { hasText: 'Sustituido' }).click();
+    await card.locator('.tarea-obs').fill('cambio de resistencia');
+
+    page.on('dialog', (dialog) => dialog.accept());
+    const requestPromise = page.waitForRequest(
+      (req) => req.url().endsWith('/api/registros') && req.method() === 'POST'
+    );
+    await page.click('.btn-guardar');
+    const req = await requestPromise;
+    const payload = JSON.parse(req.postData() || '{}');
+    expect(payload.componentes).toEqual([]);
+    expect(payload.tareas).toEqual([
+      { tarea_id: 1, resultados: ['Realizado', 'Sustituido'], observacion: 'cambio de resistencia' },
+    ]);
+  });
+
+  test('submit with nothing selected shows combined alert', async ({ page }) => {
+    await openFormRegistro(page);
+    await page.selectOption('#qr-reg-tecnico', 'tec01');
+    let alertText = '';
+    page.once('dialog', async (dialog) => { alertText = dialog.message(); await dialog.accept(); });
+    await page.click('.btn-guardar');
+    expect(alertText).toBe('Agregue una parte intervenida o complete el checklist');
+  });
+
+  test('historial shows tareas of a registro', async ({ page }) => {
+    await mockApi(page);
+    await seedSession(page, 'dataEntry');
+    // Fixture de registros con tareas
+    await page.route('http://localhost:8080/api/maquinas/MAQ-001/registros*', (route) =>
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            ...FIXTURES.registros[0],
+            tareas: [{ tarea_id: 1, tarea_nombre: 'Inspeccion Gral. Tableros', resultados: ['Realizado', 'Ajustado'], observacion: null }],
+          },
+        ]),
+      })
+    );
+    await page.goto('/qr.html?maquina=MAQ-001');
+    await expect(page.locator('#equipo-card h2')).toBeVisible();
+    await expect(page.locator('#historial-container')).toContainText('Inspeccion Gral. Tableros');
+    await expect(page.locator('#historial-container')).toContainText('Realizado, Ajustado');
+    await expect(page.locator('.hist-resumen').first()).toContainText('1 tarea');
+  });
+});

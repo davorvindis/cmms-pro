@@ -1,12 +1,15 @@
 -- CMMS Pro - Azure SQL Server Schema
 
+-- rol es texto libre (cargo/funcion). puede_ingresar distingue usuarios con
+-- acceso al sistema de personas que solo figuran en registros (sin login).
 CREATE TABLE Usuarios (
-    id           NVARCHAR(50)  PRIMARY KEY,
-    nombre       NVARCHAR(100) NOT NULL,
-    rol          NVARCHAR(20)  NOT NULL CHECK (rol IN ('Data Entry', 'Tecnico', 'Administrador')),
-    pin          NVARCHAR(10)  NOT NULL,
-    estado       NVARCHAR(10)  NOT NULL DEFAULT 'Activo' CHECK (estado IN ('Activo', 'Inactivo')),
-    created_at   DATETIME2     NOT NULL DEFAULT GETDATE()
+    id             NVARCHAR(50)  PRIMARY KEY,
+    nombre         NVARCHAR(100) NOT NULL,
+    rol            NVARCHAR(50)  NOT NULL,
+    pin            NVARCHAR(10)  NOT NULL DEFAULT '',
+    puede_ingresar BIT           NOT NULL DEFAULT 1,
+    estado         NVARCHAR(10)  NOT NULL DEFAULT 'Activo' CHECK (estado IN ('Activo', 'Inactivo')),
+    created_at     DATETIME2     NOT NULL DEFAULT GETDATE()
 );
 
 CREATE TABLE Maquinas (
@@ -23,22 +26,40 @@ CREATE TABLE Maquinas (
     created_at                DATETIME2     NOT NULL DEFAULT GETDATE()
 );
 
+-- seccion agrupa los conjuntos dentro de la maquina (ej: VE 100, SE 100, MAX 100 en la Protos)
 CREATE TABLE Componentes (
     id         INT IDENTITY(1,1) PRIMARY KEY,
     nombre     NVARCHAR(100) NOT NULL,
+    seccion    NVARCHAR(50)  NOT NULL DEFAULT '',
     maquina_id NVARCHAR(20)  NOT NULL,
     FOREIGN KEY (maquina_id) REFERENCES Maquinas(id) ON DELETE CASCADE
 );
 
 CREATE TABLE Repuestos (
-    codigo        NVARCHAR(20)  PRIMARY KEY,
+    codigo        NVARCHAR(50)  PRIMARY KEY,
     descripcion   NVARCHAR(200) NOT NULL,
+    nro_hauni     NVARCHAR(50)  NULL,
     categoria     NVARCHAR(30)  NOT NULL
                   CHECK (categoria IN ('Rodamientos', 'Correas y Transmision', 'Ventilacion',
-                         'Lubricantes', 'Turbina', 'Electricidad', 'Filtros')),
+                         'Lubricantes', 'Turbina', 'Electricidad', 'Filtros',
+                         'Sellos y Retenes', 'Neumatica', 'Resortes', 'Cuchillas y Corte',
+                         'Mecanica General')),
+    disciplina    NVARCHAR(10)  NOT NULL DEFAULT 'Mecanico'
+                  CHECK (disciplina IN ('Mecanico', 'Electrico')),
     stock_actual  INT           NOT NULL DEFAULT 0,
     stock_minimo  INT           NOT NULL DEFAULT 0,
     created_at    DATETIME2     NOT NULL DEFAULT GETDATE()
+);
+
+-- Repuestos que componen cada conjunto (segun planilla del fabricante).
+-- cantidad es NVARCHAR porque la planilla trae valores como '2,5 m'.
+CREATE TABLE ComponenteRepuestos (
+    id              INT IDENTITY(1,1) PRIMARY KEY,
+    componente_id   INT           NOT NULL,
+    repuesto_codigo NVARCHAR(50)  NOT NULL,
+    cantidad        NVARCHAR(20)  NULL,
+    FOREIGN KEY (componente_id) REFERENCES Componentes(id) ON DELETE CASCADE,
+    FOREIGN KEY (repuesto_codigo) REFERENCES Repuestos(codigo)
 );
 
 CREATE TABLE Registros (
@@ -66,11 +87,13 @@ CREATE TABLE RegistroComponentes (
     FOREIGN KEY (componente_id) REFERENCES Componentes(id)
 );
 
+-- referencia: que codigo de proveedor se uso en el cambio (pieza local o Hauni)
 CREATE TABLE RegistroRepuestos (
     id                      INT IDENTITY(1,1) PRIMARY KEY,
     registro_componente_id  INT          NOT NULL,
-    repuesto_codigo         NVARCHAR(20) NOT NULL,
+    repuesto_codigo         NVARCHAR(50) NOT NULL,
     cantidad                INT          NOT NULL DEFAULT 1,
+    referencia              NVARCHAR(10) NULL CHECK (referencia IN ('Pieza', 'Hauni')),
     FOREIGN KEY (registro_componente_id) REFERENCES RegistroComponentes(id) ON DELETE CASCADE,
     FOREIGN KEY (repuesto_codigo) REFERENCES Repuestos(codigo)
 );
@@ -79,3 +102,4 @@ CREATE INDEX IX_Registros_MaquinaId ON Registros(maquina_id);
 CREATE INDEX IX_Registros_Fecha ON Registros(fecha DESC);
 CREATE INDEX IX_Componentes_MaquinaId ON Componentes(maquina_id);
 CREATE INDEX IX_Repuestos_Categoria ON Repuestos(categoria);
+CREATE INDEX IX_ComponenteRepuestos_ComponenteId ON ComponenteRepuestos(componente_id);

@@ -3,6 +3,7 @@ package models
 type Componente struct {
 	ID        int    `json:"id"`
 	Nombre    string `json:"nombre"`
+	Seccion   string `json:"seccion"`
 	MaquinaID string `json:"maquina_id"`
 }
 

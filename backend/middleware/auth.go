@@ -22,7 +22,7 @@ func AuthRequired(database *sql.DB, dialect db.Dialect) gin.HandlerFunc {
 		}
 
 		query := "SELECT id, nombre, rol, estado FROM Usuarios WHERE id = " + dialect.Param(1) +
-			" AND pin = " + dialect.Param(2) + " AND estado = 'Activo'"
+			" AND pin = " + dialect.Param(2) + " AND pin <> '' AND puede_ingresar = 1 AND estado = 'Activo'"
 
 		var user models.Usuario
 		err := database.QueryRow(query, userID, pin).Scan(&user.ID, &user.Nombre, &user.Rol, &user.Estado)

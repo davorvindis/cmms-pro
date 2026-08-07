@@ -24,11 +24,11 @@ func (h *UsuarioHandler) Login(c *gin.Context) {
 		return
 	}
 
-	query := "SELECT id, nombre, rol, estado FROM Usuarios WHERE id = " + h.D.Param(1) +
-		" AND pin = " + h.D.Param(2) + " AND estado = 'Activo'"
+	query := "SELECT id, nombre, rol, puede_ingresar, estado FROM Usuarios WHERE id = " + h.D.Param(1) +
+		" AND pin = " + h.D.Param(2) + " AND pin <> '' AND puede_ingresar = 1 AND estado = 'Activo'"
 
 	var user models.Usuario
-	err := h.DB.QueryRow(query, req.ID, req.Pin).Scan(&user.ID, &user.Nombre, &user.Rol, &user.Estado)
+	err := h.DB.QueryRow(query, req.ID, req.Pin).Scan(&user.ID, &user.Nombre, &user.Rol, &user.PuedeIngresar, &user.Estado)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Credenciales invalidas"})
 		return
@@ -38,7 +38,7 @@ func (h *UsuarioHandler) Login(c *gin.Context) {
 }
 
 func (h *UsuarioHandler) List(c *gin.Context) {
-	query := "SELECT id, nombre, rol, estado FROM Usuarios WHERE 1=1"
+	query := "SELECT id, nombre, rol, puede_ingresar, estado FROM Usuarios WHERE 1=1"
 	var args []interface{}
 	argIdx := 1
 
@@ -60,7 +60,7 @@ func (h *UsuarioHandler) List(c *gin.Context) {
 	usuarios := []models.Usuario{}
 	for rows.Next() {
 		var u models.Usuario
-		if err := rows.Scan(&u.ID, &u.Nombre, &u.Rol, &u.Estado); err != nil {
+		if err := rows.Scan(&u.ID, &u.Nombre, &u.Rol, &u.PuedeIngresar, &u.Estado); err != nil {
 			continue
 		}
 		usuarios = append(usuarios, u)
@@ -75,10 +75,31 @@ func (h *UsuarioHandler) Create(c *gin.Context) {
 		return
 	}
 
-	query := fmt.Sprintf("INSERT INTO Usuarios (id, nombre, rol, pin) VALUES (%s, %s, %s, %s)",
-		h.D.Param(1), h.D.Param(2), h.D.Param(3), h.D.Param(4))
+	// Solo un Administrador puede crear usuarios con acceso al sistema;
+	// cualquier usuario logueado puede dar de alta personas "solo registro".
+	if req.PuedeIngresar {
+		if u, ok := c.Get("user"); !ok || u.(models.Usuario).Rol != "Administrador" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Solo un administrador puede crear usuarios con acceso"})
+			return
+		}
+	}
 
-	_, err := h.DB.Exec(query, req.ID, req.Nombre, req.Rol, req.Pin)
+	if req.PuedeIngresar && req.Pin == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Un usuario con acceso necesita PIN"})
+		return
+	}
+	if !req.PuedeIngresar {
+		req.Pin = "" // sin acceso, sin credenciales
+	}
+
+	puede := 0
+	if req.PuedeIngresar {
+		puede = 1
+	}
+	query := fmt.Sprintf("INSERT INTO Usuarios (id, nombre, rol, pin, puede_ingresar) VALUES (%s, %s, %s, %s, %s)",
+		h.D.Param(1), h.D.Param(2), h.D.Param(3), h.D.Param(4), h.D.Param(5))
+
+	_, err := h.DB.Exec(query, req.ID, req.Nombre, req.Rol, req.Pin, puede)
 	if err != nil {
 		c.JSON(http.StatusConflict, gin.H{"error": "El usuario ya existe o datos invalidos"})
 		return
@@ -112,6 +133,15 @@ func (h *UsuarioHandler) Update(c *gin.Context) {
 	if req.Pin != nil {
 		sets = append(sets, "pin = "+h.D.Param(argIdx))
 		args = append(args, *req.Pin)
+		argIdx++
+	}
+	if req.PuedeIngresar != nil {
+		puede := 0
+		if *req.PuedeIngresar {
+			puede = 1
+		}
+		sets = append(sets, "puede_ingresar = "+h.D.Param(argIdx))
+		args = append(args, puede)
 		argIdx++
 	}
 	if req.Estado != nil {
