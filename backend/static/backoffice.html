@@ -909,9 +909,22 @@ async function loadEquipos() {
       <td>
         <button class="btn btn-outline btn-sm" onclick='editarMaquina(${JSON.stringify(m).replace(/'/g,"&#39;")})'>Editar</button>
         <button class="btn btn-outline btn-sm" style="margin-left:4px;" onclick='abrirModalQR(${JSON.stringify({id:m.id,nombre:m.nombre,ubicacion:m.ubicacion}).replace(/'/g,"&#39;")})'>QR</button>
+        ${currentUser?.rol === 'Administrador' ? `<button class="btn btn-sm" style="margin-left:4px;background:#f8d7da;color:#721c24;" onclick="eliminarMaquina('${m.id}')">Eliminar</button>` : ''}
       </td>
     </tr>`;
   }).join('');
+}
+
+async function eliminarMaquina(id) {
+  const escrito = prompt(`Vas a ELIMINAR la maquina ${id} con sus componentes y tareas.\nEsta accion no se puede deshacer.\n\nPara confirmar, escribi el codigo de la maquina:`);
+  if (escrito === null) return;
+  if (escrito.trim() !== id) { alert('El codigo no coincide, no se elimino nada.'); return; }
+  const res = await api('/maquinas/' + encodeURIComponent(id), { method: 'DELETE' });
+  if (res && !res.error) {
+    loadEquipos();
+  } else {
+    alert(res?.error || 'No se pudo eliminar. Si la maquina tiene registros de mantenimiento cargados, no se puede borrar (para conservar el historial).');
+  }
 }
 
 // Registros

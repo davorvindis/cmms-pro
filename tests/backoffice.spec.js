@@ -605,3 +605,39 @@ test.describe('Repuestos disciplina', () => {
     expect(payload.disciplina).toBe('Electrico');
   });
 });
+
+// ---------------------------------------------------------------------------
+// 11. Eliminar maquina
+// ---------------------------------------------------------------------------
+
+test.describe('Eliminar maquina', () => {
+  test('admin ve el boton Eliminar en cada fila', async ({ page }) => {
+    await openBackoffice(page);
+    await page.click('text=Maquinas / Activos');
+    await expect(page.locator('#equipos-tbody button:has-text("Eliminar")')).toHaveCount(FIXTURES.maquinas.length);
+  });
+
+  test('codigo mal escrito no elimina y avisa', async ({ page }) => {
+    await openBackoffice(page);
+    await page.click('text=Maquinas / Activos');
+    const dialogs = [];
+    page.on('dialog', async (d) => {
+      dialogs.push(d.type());
+      if (d.type() === 'prompt') await d.accept('OTRA-COSA');
+      else await d.accept();
+    });
+    await page.locator('#equipos-tbody button:has-text("Eliminar")').first().click();
+    await expect.poll(() => dialogs).toContain('alert');
+  });
+
+  test('confirmando con el codigo exacto manda DELETE', async ({ page }) => {
+    await openBackoffice(page);
+    await page.click('text=Maquinas / Activos');
+    page.on('dialog', (d) => d.accept('MAQ-001'));
+    const requestPromise = page.waitForRequest(
+      (req) => req.url().endsWith('/api/maquinas/MAQ-001') && req.method() === 'DELETE'
+    );
+    await page.locator('#equipos-tbody button:has-text("Eliminar")').first().click();
+    await requestPromise;
+  });
+});
