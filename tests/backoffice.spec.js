@@ -721,8 +721,8 @@ test.describe('Mantenimientos', () => {
     await page.selectOption('#mant-maquina', 'MAQ-001');
     await page.fill('#mant-titulo', 'Mantenimiento de prueba');
     await page.fill('#mant-horas', '1.000 hs');
-    // La primera fila se agrega sola al elegir maquina
-    await page.selectOption('#mant-items-list select[id^="mant-item-comp-"]', '1');
+    // La primera fila se agrega sola al elegir maquina; el conjunto se busca escribiendo
+    await page.fill('#mant-items-list input[id^="mant-item-comp-"]', 'Turbina');
     await page.fill('#mant-items-list input[id^="mant-item-tarea-"]', 'limpieza');
 
     const requestPromise = page.waitForRequest(
@@ -801,5 +801,29 @@ test.describe('Editar usuario', () => {
     const req = await requestPromise;
     const payload = JSON.parse(req.postData() || '{}');
     expect(payload).toEqual({ nombre: 'Carlos Gomez Perez' });
+  });
+});
+
+test.describe('Mantenimientos — buscador de conjuntos', () => {
+  test('conjunto tipeado que no existe muestra alerta y no envia', async ({ page }) => {
+    await openBackoffice(page);
+    await page.click('nav >> text=Mantenimientos');
+    await page.click('button:has-text("+ Nuevo Mantenimiento")');
+    await page.selectOption('#mant-maquina', 'MAQ-001');
+    await page.fill('#mant-titulo', 'Prueba');
+    await page.fill('#mant-items-list input[id^="mant-item-comp-"]', 'NoExiste');
+    await page.fill('#mant-items-list input[id^="mant-item-tarea-"]', 'limpieza');
+    let alertText = '';
+    page.once('dialog', async (d) => { alertText = d.message(); await d.accept(); });
+    await page.click('#modal-mant button:has-text("Crear Mantenimiento")');
+    expect(alertText).toContain('Conjunto no reconocido');
+  });
+
+  test('el datalist de conjuntos se llena con los de la maquina', async ({ page }) => {
+    await openBackoffice(page);
+    await page.click('nav >> text=Mantenimientos');
+    await page.click('button:has-text("+ Nuevo Mantenimiento")');
+    await page.selectOption('#mant-maquina', 'MAQ-001');
+    await expect(page.locator('#mant-conjuntos-list option')).toHaveCount(FIXTURES.maquinas[0].componentes.length);
   });
 });

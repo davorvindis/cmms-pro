@@ -789,6 +789,7 @@
         <div id="mant-items-list"></div>
         <button class="btn-add-sm" onclick="mantAddItem()">+ Agregar fila</button>
         <datalist id="tareas-sugeridas"></datalist>
+        <datalist id="mant-conjuntos-list"></datalist>
       </div>
     </div>
     <div class="modal-footer">
@@ -1422,12 +1423,27 @@ function abrirModalMant() {
   document.getElementById('modal-mant').classList.add('show');
 }
 
+// label visible del conjunto -> id (para resolver lo que se tipea en el buscador)
+let mantConjuntoMap = {};
+
+function mantEtiquetaConjunto(c) {
+  return (c.seccion ? c.seccion + ' — ' : '') + c.nombre;
+}
+
 function mantMaquinaCambio() {
   mantItemCounter = 0;
   document.getElementById('mant-items-list').innerHTML = '';
   const maq = mantMaquinas.find(m => m.id === document.getElementById('mant-maquina').value);
   const titulo = document.getElementById('mant-titulo');
   if (maq && !titulo.value) titulo.value = 'Mantenimiento ' + maq.nombre.split(' - ')[0];
+
+  // Buscador: un solo datalist con todos los conjuntos de la maquina (todas las secciones)
+  mantConjuntoMap = {};
+  const comps = maq?.componentes || [];
+  comps.forEach(c => { mantConjuntoMap[mantEtiquetaConjunto(c)] = c.id; });
+  document.getElementById('mant-conjuntos-list').innerHTML =
+    Object.keys(mantConjuntoMap).map(l => `<option value="${l}">`).join('');
+
   if (maq) mantAddItem();
 }
 
@@ -1437,37 +1453,20 @@ function mantComponentes() {
 }
 
 function mantAddItem() {
-  const comps = mantComponentes();
   if (!document.getElementById('mant-maquina').value) { alert('Seleccione una maquina primero'); return; }
-  if (!comps.length) { alert('La maquina no tiene conjuntos cargados'); return; }
+  if (!mantComponentes().length) { alert('La maquina no tiene conjuntos cargados'); return; }
 
-  const secciones = [...new Set(comps.map(c => c.seccion).filter(Boolean))];
   const idx = mantItemCounter++;
   const div = document.createElement('div');
   div.className = 'mant-item-row';
   div.id = `mant-item-${idx}`;
   div.style.cssText = 'display:flex;gap:6px;margin-bottom:6px;align-items:center;';
-
-  const conjuntoSel = secciones.length
-    ? `<select id="mant-item-secc-${idx}" style="flex:0 0 110px;" onchange="mantCargarConjuntos(${idx})">
-        <option value="">Seccion...</option>${secciones.map(s => `<option value="${s}">${s}</option>`).join('')}
-      </select>
-      <select id="mant-item-comp-${idx}" style="flex:1;"><option value="">Conjunto...</option></select>`
-    : `<select id="mant-item-comp-${idx}" style="flex:1;">
-        <option value="">Conjunto...</option>${comps.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('')}
-      </select>`;
-
-  div.innerHTML = `${conjuntoSel}
+  div.innerHTML = `
+    <input type="text" id="mant-item-comp-${idx}" list="mant-conjuntos-list" placeholder="Escribi para buscar el conjunto..." style="flex:1;">
     <input type="text" id="mant-item-tarea-${idx}" list="tareas-sugeridas" placeholder="Tarea (ej: limpieza)" style="flex:0 0 180px;">
     <button class="btn-remove-sm" onclick="document.getElementById('mant-item-${idx}').remove()">&times;</button>`;
   document.getElementById('mant-items-list').appendChild(div);
-}
-
-function mantCargarConjuntos(idx) {
-  const secc = document.getElementById(`mant-item-secc-${idx}`).value;
-  const comps = mantComponentes().filter(c => c.seccion === secc);
-  document.getElementById(`mant-item-comp-${idx}`).innerHTML =
-    '<option value="">Conjunto...</option>' + comps.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+  div.querySelector(`#mant-item-comp-${idx}`).focus();
 }
 
 async function guardarMantenimiento() {
@@ -1476,13 +1475,17 @@ async function guardarMantenimiento() {
   if (!maquinaId || !titulo) { alert('Complete maquina y titulo'); return; }
 
   const items = [];
-  let incompleto = false;
+  let incompleto = false, noReconocido = null;
   document.querySelectorAll('#mant-items-list .mant-item-row').forEach((row, i) => {
-    const compSel = row.querySelector('select[id^="mant-item-comp-"]');
+    const texto = row.querySelector('input[id^="mant-item-comp-"]').value.trim();
     const tarea = row.querySelector('input[id^="mant-item-tarea-"]').value.trim();
-    if (!compSel.value || !tarea) { incompleto = true; return; }
-    items.push({ componente_id: parseInt(compSel.value), tarea, orden: i + 1 });
+    if (!texto && !tarea) return; // fila vacia se ignora
+    if (!texto || !tarea) { incompleto = true; return; }
+    const compId = mantConjuntoMap[texto];
+    if (!compId) { noReconocido = texto; return; }
+    items.push({ componente_id: compId, tarea, orden: i + 1 });
   });
+  if (noReconocido) { alert(`Conjunto no reconocido: "${noReconocido}". Elegilo de la lista que aparece al escribir.`); return; }
   if (incompleto) { alert('Hay filas sin conjunto o sin tarea'); return; }
   if (!items.length) { alert('Agregue al menos una fila'); return; }
 
