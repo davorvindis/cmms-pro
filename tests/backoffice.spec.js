@@ -695,3 +695,111 @@ test.describe('Detalle de registro', () => {
     await expect(page.locator('#detalle-body')).toContainText('Rodamiento 6205-2RS SKF x2');
   });
 });
+
+// ---------------------------------------------------------------------------
+// 14. Mantenimientos planificados
+// ---------------------------------------------------------------------------
+
+test.describe('Mantenimientos', () => {
+  async function openMants(page) {
+    await openBackoffice(page);
+    await page.click('nav >> text=Mantenimientos');
+    await expect(page.locator('#page-mantenimientos')).toHaveClass(/active/);
+  }
+
+  test('pagina lista mantenimientos con estados y tiles', async ({ page }) => {
+    await openMants(page);
+    await expect(page.locator('#mants-tbody tr')).toHaveCount(2);
+    await expect(page.locator('#mant-tile-pendientes')).toHaveText('1');
+    await expect(page.locator('#mant-tile-completados')).toHaveText('1');
+    await expect(page.locator('#mants-tbody .badge-yellow')).toHaveText('Pendiente');
+  });
+
+  test('crear mantenimiento manda payload con items', async ({ page }) => {
+    await openMants(page);
+    await page.click('button:has-text("+ Nuevo Mantenimiento")');
+    await page.selectOption('#mant-maquina', 'MAQ-001');
+    await page.fill('#mant-titulo', 'Mantenimiento de prueba');
+    await page.fill('#mant-horas', '1.000 hs');
+    // La primera fila se agrega sola al elegir maquina
+    await page.selectOption('#mant-items-list select[id^="mant-item-comp-"]', '1');
+    await page.fill('#mant-items-list input[id^="mant-item-tarea-"]', 'limpieza');
+
+    const requestPromise = page.waitForRequest(
+      (req) => req.url().endsWith('/api/mantenimientos') && req.method() === 'POST'
+    );
+    await page.click('#modal-mant button:has-text("Crear Mantenimiento")');
+    const req = await requestPromise;
+    const payload = JSON.parse(req.postData() || '{}');
+    expect(payload).toMatchObject({
+      maquina_id: 'MAQ-001',
+      titulo: 'Mantenimiento de prueba',
+      horas_marcha: '1.000 hs',
+      items: [{ componente_id: 1, tarea: 'limpieza', orden: 1 }],
+    });
+  });
+
+  test('completar manda tecnico, observaciones e items', async ({ page }) => {
+    await openMants(page);
+    await page.click('#mants-tbody button:has-text("Completar")');
+    await expect(page.locator('#modal-mant-comp')).toHaveClass(/show/);
+    await expect(page.locator('#mant-comp-items [data-item-id]')).toHaveCount(2);
+
+    const card = page.locator('#mant-comp-items [data-item-id="11"]');
+    await card.locator('.mant-it-mecanico').selectOption('tec01');
+    await card.locator('.mant-it-novedades').fill('cambio de pernos');
+
+    await page.selectOption('#mant-comp-tecnico', 'tec02');
+    page.on('dialog', (d) => d.accept());
+    const requestPromise = page.waitForRequest(
+      (req) => /\/api\/mantenimientos\/1\/completar$/.test(req.url()) && req.method() === 'POST'
+    );
+    await page.click('button:has-text("Completar mantenimiento")');
+    const req = await requestPromise;
+    const payload = JSON.parse(req.postData() || '{}');
+    expect(payload.tecnico_id).toBe('tec02');
+    expect(payload.items.find((i) => i.item_id === 11)).toMatchObject({ mecanico_id: 'tec01', novedades: 'cambio de pernos' });
+  });
+
+  test('hoja imprimible abre popup con las columnas del papel', async ({ page }) => {
+    await openMants(page);
+    const popupPromise = page.waitForEvent('popup');
+    await page.click('#mants-tbody button:has-text("Hoja")');
+    const popup = await popupPromise;
+    await expect(popup.locator('table')).toContainText('Novedades');
+    await expect(popup.locator('table')).toContainText('Mecanico');
+    await expect(popup.locator('body')).toContainText('Mantenimiento VE serie 989');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 15. Editar usuarios
+// ---------------------------------------------------------------------------
+
+test.describe('Editar usuario', () => {
+  test('admin ve boton Editar y el modal precarga los datos', async ({ page }) => {
+    await openBackoffice(page);
+    await page.click('text=Tecnicos & Usuarios');
+    await expect(page.locator('#usuarios-tbody button:has-text("Editar")')).toHaveCount(Object.keys(FIXTURES.users).length);
+    await page.locator('#usuarios-tbody tr:has-text("Carlos Gomez") button:has-text("Editar")').click();
+    await expect(page.locator('#modal-usuario')).toHaveClass(/show/);
+    await expect(page.locator('#modal-usuario-title')).toHaveText('Editar Usuario');
+    await expect(page.locator('#us-nombre')).toHaveValue('Carlos Gomez');
+    await expect(page.locator('#us-dni')).toHaveValue('tec01');
+  });
+
+  test('guardar cambios manda PUT solo con lo modificado y sin pin vacio', async ({ page }) => {
+    await openBackoffice(page);
+    await page.click('text=Tecnicos & Usuarios');
+    await page.locator('#usuarios-tbody tr:has-text("Carlos Gomez") button:has-text("Editar")').click();
+    await page.fill('#us-nombre', 'Carlos Gomez Perez');
+
+    const requestPromise = page.waitForRequest(
+      (req) => req.url().endsWith('/api/usuarios/tec01') && req.method() === 'PUT'
+    );
+    await page.click('#btn-guardar-usuario');
+    const req = await requestPromise;
+    const payload = JSON.parse(req.postData() || '{}');
+    expect(payload).toEqual({ nombre: 'Carlos Gomez Perez' });
+  });
+});

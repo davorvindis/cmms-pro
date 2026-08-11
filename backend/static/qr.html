@@ -217,6 +217,15 @@
   </div>
 </div>
 
+<!-- Mantenimientos pendientes -->
+<div class="form-section" id="qr-mants-seccion" style="display:none;">
+  <h3>
+    <span class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#0f3460" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+    Mantenimientos pendientes
+  </h3>
+  <div id="qr-mants-list"></div>
+</div>
+
 <!-- Historial -->
 <div id="tab-historial">
   <div class="form-section">
@@ -236,6 +245,33 @@
 <div class="bottom-spacer"></div>
 
 <button class="btn-registrar-fixed" onclick="abrirFormRegistro()">+ Registrar mantenimiento</button>
+
+<!-- Completar mantenimiento planificado (requiere login) -->
+<div class="form-overlay" id="form-mant">
+  <div class="form-overlay-header">
+    <h2 id="qr-mant-titulo">Completar mantenimiento</h2>
+    <button class="form-overlay-close" onclick="document.getElementById('form-mant').classList.remove('show')">&times;</button>
+  </div>
+  <div class="form-section">
+    <div style="font-size:12px;color:#9ca3af;margin-bottom:10px;">Cargar por cada tarea el mecanico que la hizo, novedades si hubo, y la fecha.</div>
+    <div id="qr-mant-items"></div>
+  </div>
+  <div class="form-section">
+    <div class="form-group">
+      <label>Responsable general (para el historial)</label>
+      <select id="qr-mant-tecnico"><option value="">Seleccionar...</option></select>
+    </div>
+    <div class="form-group">
+      <label>Observaciones generales</label>
+      <textarea id="qr-mant-obs" rows="2" placeholder="Opcional..."></textarea>
+    </div>
+  </div>
+  <div class="form-actions">
+    <button class="btn-guardar" onclick="qrCompletarMant()">Completar mantenimiento</button>
+    <button class="hist-mas" style="margin-top:8px;" onclick="qrGuardarAvanceMant()">Guardar avance sin completar</button>
+  </div>
+  <div class="bottom-spacer"></div>
+</div>
 
 <!-- Formulario de registro (requiere login) -->
 <div class="form-overlay" id="form-registro">
@@ -364,6 +400,11 @@ async function doLogin() {
   document.getElementById('login-overlay').classList.remove('show');
   renderUserBadge();
   if (accionPendiente === 'registro') { accionPendiente = null; mostrarFormRegistro(); }
+  else if (accionPendiente && accionPendiente.startsWith('mant-')) {
+    const id = parseInt(accionPendiente.slice(5));
+    accionPendiente = null;
+    qrMostrarMant(id);
+  }
 }
 
 function quickLogin(id, pin) {
@@ -407,6 +448,102 @@ async function init() {
 
   renderEquipoCard();
   loadHistorial();
+  loadMantsPendientes();
+}
+
+// ============ Mantenimientos planificados pendientes ============
+let qrMants = [];
+let qrMantActual = null;
+
+async function loadMantsPendientes() {
+  qrMants = await api(`/maquinas/${maquinaData.id}/mantenimientos?estado=Pendiente`) || [];
+  const secc = document.getElementById('qr-mants-seccion');
+  if (!qrMants.length) { secc.style.display = 'none'; return; }
+  secc.style.display = '';
+  document.getElementById('qr-mants-list').innerHTML = qrMants.map(m => `
+    <div class="tarea-card">
+      <div class="tarea-card-head">
+        <div>
+          <div class="tarea-nombre">${m.titulo}</div>
+          <div class="tarea-desc">${(m.items || []).length} tareas${m.horas_marcha ? ' · Horas: ' + m.horas_marcha : ''}</div>
+        </div>
+        <button class="btn-add-sm" style="width:auto;margin:0;border-style:solid;flex-shrink:0;" onclick="qrAbrirMant(${m.id})">Completar</button>
+      </div>
+    </div>`).join('');
+}
+
+function qrAbrirMant(id) {
+  if (!currentUser) {
+    accionPendiente = 'mant-' + id;
+    document.getElementById('login-overlay').classList.add('show');
+    return;
+  }
+  qrMostrarMant(id);
+}
+
+async function qrMostrarMant(id) {
+  qrMantActual = qrMants.find(m => m.id === id);
+  if (!qrMantActual) return;
+  const usuarios = await api('/usuarios');
+  if (!usuarios) return;
+  const opciones = usuarios.filter(u => u.estado === 'Activo')
+    .map(u => `<option value="${u.id}">${u.nombre} (${u.rol})</option>`).join('');
+
+  document.getElementById('qr-mant-titulo').textContent = qrMantActual.titulo;
+  document.getElementById('qr-mant-tecnico').innerHTML = '<option value="">Seleccionar...</option>' + opciones;
+  document.getElementById('qr-mant-obs').value = '';
+
+  const hoy = new Date().toISOString().slice(0, 10);
+  document.getElementById('qr-mant-items').innerHTML = qrMantActual.items.map(it => `
+    <div class="tarea-card" data-item-id="${it.id}">
+      <div class="tarea-nombre">${it.seccion ? it.seccion + ' — ' : ''}${it.componente_nombre}</div>
+      <div class="tarea-desc">${it.tarea}</div>
+      <select class="qr-mant-mecanico tarea-obs"><option value="">Mecanico...</option>${opciones}</select>
+      <input type="text" class="qr-mant-novedades tarea-obs" placeholder="Novedades (opcional)" value="${it.novedades || ''}">
+      <input type="date" class="qr-mant-fecha tarea-obs" value="${it.fecha ? it.fecha.slice(0, 10) : hoy}">
+    </div>`).join('');
+  qrMantActual.items.forEach(it => {
+    if (it.mecanico_id) {
+      const sel = document.querySelector(`#qr-mant-items [data-item-id="${it.id}"] .qr-mant-mecanico`);
+      if (sel) sel.value = it.mecanico_id;
+    }
+  });
+  document.getElementById('form-mant').classList.add('show');
+}
+
+function qrMantItemsPayload() {
+  return [...document.querySelectorAll('#qr-mant-items [data-item-id]')].map(card => ({
+    item_id: parseInt(card.dataset.itemId),
+    mecanico_id: card.querySelector('.qr-mant-mecanico').value,
+    novedades: card.querySelector('.qr-mant-novedades').value.trim(),
+    fecha: card.querySelector('.qr-mant-fecha').value
+  }));
+}
+
+async function qrGuardarAvanceMant() {
+  const res = await api('/mantenimientos/' + qrMantActual.id, { method: 'PUT', body: JSON.stringify({ items: qrMantItemsPayload() }) });
+  if (res && !res.error) {
+    document.getElementById('form-mant').classList.remove('show');
+    alert('Avance guardado');
+    init();
+  } else { alert(res?.error || 'Error al guardar'); }
+}
+
+async function qrCompletarMant() {
+  const tecnicoId = document.getElementById('qr-mant-tecnico').value;
+  if (!tecnicoId) { alert('Seleccione el responsable general'); return; }
+  if (!confirm('Se completa el mantenimiento y se genera el registro en el historial. ¿Continuar?')) return;
+
+  const res = await api('/mantenimientos/' + qrMantActual.id + '/completar', { method: 'POST', body: JSON.stringify({
+    tecnico_id: tecnicoId,
+    observaciones: document.getElementById('qr-mant-obs').value.trim() || null,
+    items: qrMantItemsPayload()
+  })});
+  if (res && !res.error) {
+    document.getElementById('form-mant').classList.remove('show');
+    alert('Mantenimiento completado');
+    init();
+  } else { alert(res?.error || 'Error al completar'); }
 }
 
 function renderComponentesChips() {

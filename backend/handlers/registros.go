@@ -236,32 +236,8 @@ func (h *RegistroHandler) Create(c *gin.Context) {
 		}
 	}
 
-	// 4. Update machine: ultimo = ultima fecha registrada, proximo = la fecha
-	// futura mas cercana entre todos los registros (no la del ultimo cargado).
-	today := time.Now().Format("2006-01-02")
-	qFechas := fmt.Sprintf(`SELECT %s, %s FROM Registros WHERE maquina_id = %s`,
-		h.D.DateTimeToStr("MAX(fecha)"),
-		h.D.DateToStr(fmt.Sprintf("MIN(CASE WHEN proximo_mantenimiento >= %s THEN proximo_mantenimiento END)", h.D.Param(1))),
-		h.D.Param(2))
-
-	var ultimo, proximo sql.NullString
-	if err := tx.QueryRow(qFechas, today, req.MaquinaID).Scan(&ultimo, &proximo); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al calcular fechas", "detail": err.Error()})
-		return
-	}
-
-	estado := "Operativo"
-	if proximo.Valid && len(proximo.String) >= 10 {
-		if d, perr := time.Parse("2006-01-02", proximo.String[:10]); perr == nil && time.Until(d).Hours() <= 7*24 {
-			estado = "Prox. mant."
-		}
-	}
-
-	updateMaq := fmt.Sprintf(
-		"UPDATE Maquinas SET ultimo_mantenimiento = %s, proximo_mantenimiento = %s, estado = %s WHERE id = %s",
-		h.D.Param(1), h.D.Param(2), h.D.Param(3), h.D.Param(4))
-
-	if _, err = tx.Exec(updateMaq, ultimo, proximo, estado, req.MaquinaID); err != nil {
+	// 4. Update machine
+	if err := actualizarEstadoMaquina(tx, h.D, req.MaquinaID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar maquina", "detail": err.Error()})
 		return
 	}
@@ -272,6 +248,36 @@ func (h *RegistroHandler) Create(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"id": registroID, "message": "Registro creado exitosamente"})
+}
+
+// actualizarEstadoMaquina recalcula ultimo/proximo mantenimiento y estado de la
+// maquina a partir de sus registros: ultimo = ultima fecha registrada, proximo =
+// la fecha futura mas cercana entre todos los registros. Correr dentro de la tx.
+func actualizarEstadoMaquina(tx *sql.Tx, d db.Dialect, maquinaID string) error {
+	today := time.Now().Format("2006-01-02")
+	qFechas := fmt.Sprintf(`SELECT %s, %s FROM Registros WHERE maquina_id = %s`,
+		d.DateTimeToStr("MAX(fecha)"),
+		d.DateToStr(fmt.Sprintf("MIN(CASE WHEN proximo_mantenimiento >= %s THEN proximo_mantenimiento END)", d.Param(1))),
+		d.Param(2))
+
+	var ultimo, proximo sql.NullString
+	if err := tx.QueryRow(qFechas, today, maquinaID).Scan(&ultimo, &proximo); err != nil {
+		return err
+	}
+
+	estado := "Operativo"
+	if proximo.Valid && len(proximo.String) >= 10 {
+		if dte, perr := time.Parse("2006-01-02", proximo.String[:10]); perr == nil && time.Until(dte).Hours() <= 7*24 {
+			estado = "Prox. mant."
+		}
+	}
+
+	updateMaq := fmt.Sprintf(
+		"UPDATE Maquinas SET ultimo_mantenimiento = %s, proximo_mantenimiento = %s, estado = %s WHERE id = %s",
+		d.Param(1), d.Param(2), d.Param(3), d.Param(4))
+
+	_, err := tx.Exec(updateMaq, ultimo, proximo, estado, maquinaID)
+	return err
 }
 
 func (h *RegistroHandler) Delete(c *gin.Context) {

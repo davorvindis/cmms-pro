@@ -82,6 +82,28 @@ const FIXTURES = {
     { id: 3, maquina_id: 'MAQ-002', nombre: 'Inspeccion de iluminacion Gral.', descripcion: null, tiempo_estimado_min: 45, frecuencia: 'Trimestral', asignado_id: null, asignado_nombre: null, orden: 1, activa: false, ultima_ejecucion: null, proxima_fecha: null, estado: 'nunca' },
   ],
 
+  mantenimientos: [
+    {
+      id: 1, maquina_id: 'MAQ-001', maquina_nombre: 'Turbina Principal',
+      titulo: 'Mantenimiento VE serie 989', horas_marcha: '6.222 hs', horas_turbinas: '7.724 hs',
+      estado: 'Pendiente', creado_por_id: 'admin', creado_por_nombre: 'Admin Beto',
+      fecha_completado: null, registro_id: null, created_at: '2026-08-10 09:00',
+      items: [
+        { id: 11, componente_id: 1, componente_nombre: 'Turbina', seccion: '', tarea: 'limpieza', novedades: null, mecanico_id: null, mecanico_nombre: null, fecha: null, orden: 1 },
+        { id: 12, componente_id: 2, componente_nombre: 'Motor principal', seccion: '', tarea: 'control de correas', novedades: null, mecanico_id: null, mecanico_nombre: null, fecha: null, orden: 2 },
+      ],
+    },
+    {
+      id: 2, maquina_id: 'MAQ-002', maquina_nombre: 'Compresor Norte',
+      titulo: 'Mantenimiento compresor', horas_marcha: null, horas_turbinas: null,
+      estado: 'Completado', creado_por_id: 'admin', creado_por_nombre: 'Admin Beto',
+      fecha_completado: '2026-08-01 10:00', registro_id: 101, created_at: '2026-07-28 09:00',
+      items: [
+        { id: 21, componente_id: 5, componente_nombre: 'Compresor', seccion: '', tarea: 'lubricacion', novedades: 'ok', mecanico_id: 'tec01', mecanico_nombre: 'Carlos Gomez', fecha: '2026-08-01', orden: 1 },
+      ],
+    },
+  ],
+
   dashboardStats: {
     maquinas_activas: 5,
     mantenimientos_pendientes: 3,
@@ -193,6 +215,43 @@ async function mockApi(page) {
     const items = FIXTURES.tareas.filter((t) => t.maquina_id === m[1] && t.activa);
     route.fulfill({ contentType: 'application/json', body: JSON.stringify(items) });
   });
+
+  // Maquina mantenimientos pendientes (GET /maquinas/:id/mantenimientos) — publica
+  await page.route(/\/api\/maquinas\/([^/]+)\/mantenimientos/, (route) => {
+    const m = route.request().url().match(/maquinas\/([^/]+)\/mantenimientos/);
+    const url = new URL(route.request().url());
+    const estado = url.searchParams.get('estado');
+    const items = FIXTURES.mantenimientos.filter(
+      (x) => x.maquina_id === m[1] && (!estado || x.estado === estado)
+    );
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify(items) });
+  });
+
+  // Mantenimientos list + create
+  await page.route(`${API}/mantenimientos`, async (route) => {
+    if (route.request().method() === 'POST') {
+      await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ id: 99, message: 'Mantenimiento creado' }) });
+    } else {
+      await route.fulfill({ contentType: 'application/json', body: JSON.stringify(FIXTURES.mantenimientos) });
+    }
+  });
+
+  // Mantenimiento get/update + completar
+  await page.route(/\/api\/mantenimientos\/\d+$/, (route) => {
+    if (route.request().method() === 'GET') {
+      route.fulfill({ contentType: 'application/json', body: JSON.stringify(FIXTURES.mantenimientos[0]) });
+    } else {
+      route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'ok' }) });
+    }
+  });
+  await page.route(/\/api\/mantenimientos\/\d+\/completar$/, (route) =>
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'Mantenimiento completado', registro_id: 999 }) })
+  );
+
+  // Sugerencias de tareas para el datalist
+  await page.route(`${API}/tareas-sugeridas`, (route) =>
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify(['limpieza', 'control de correas', 'lubricacion']) })
+  );
 
   // Tareas list + create
   await page.route(`${API}/tareas`, async (route) => {

@@ -637,3 +637,52 @@ test.describe('Checklist preventivo', () => {
     await expect(page.locator('.hist-resumen').first()).toContainText('1 tarea');
   });
 });
+
+// ---------------------------------------------------------------------------
+// 9. Mantenimientos planificados en QR
+// ---------------------------------------------------------------------------
+
+test.describe('QR — Mantenimientos pendientes', () => {
+  test('la ficha muestra los mantenimientos pendientes de la maquina', async ({ page }) => {
+    await mockApi(page);
+    await seedSession(page, 'dataEntry');
+    await page.goto('/qr.html?maquina=MAQ-001');
+    await expect(page.locator('#equipo-card h2')).toBeVisible();
+    await expect(page.locator('#qr-mants-seccion')).toBeVisible();
+    await expect(page.locator('#qr-mants-list .tarea-card')).toHaveCount(1);
+    await expect(page.locator('#qr-mants-list')).toContainText('Mantenimiento VE serie 989');
+  });
+
+  test('maquina sin pendientes no muestra la seccion', async ({ page }) => {
+    await mockApi(page);
+    await seedSession(page, 'dataEntry');
+    await page.goto('/qr.html?maquina=MAQ-002');
+    await expect(page.locator('#equipo-card h2')).toBeVisible();
+    await expect(page.locator('#qr-mants-seccion')).toBeHidden();
+  });
+
+  test('completar desde el QR manda el payload correcto', async ({ page }) => {
+    await mockApi(page);
+    await seedSession(page, 'dataEntry');
+    await page.goto('/qr.html?maquina=MAQ-001');
+    await expect(page.locator('#qr-mants-seccion')).toBeVisible();
+    await page.click('#qr-mants-list button:has-text("Completar")');
+    await expect(page.locator('#form-mant')).toHaveClass(/show/);
+    await expect(page.locator('#qr-mant-items [data-item-id]')).toHaveCount(2);
+
+    const card = page.locator('#qr-mant-items [data-item-id="12"]');
+    await card.locator('.qr-mant-mecanico').selectOption('maciel');
+    await card.locator('.qr-mant-novedades').fill('correa gastada');
+    await page.selectOption('#qr-mant-tecnico', 'tec01');
+
+    page.on('dialog', (d) => d.accept());
+    const requestPromise = page.waitForRequest(
+      (req) => /\/api\/mantenimientos\/1\/completar$/.test(req.url()) && req.method() === 'POST'
+    );
+    await page.click('button:has-text("Completar mantenimiento")');
+    const req = await requestPromise;
+    const payload = JSON.parse(req.postData() || '{}');
+    expect(payload.tecnico_id).toBe('tec01');
+    expect(payload.items.find((i) => i.item_id === 12)).toMatchObject({ mecanico_id: 'maciel', novedades: 'correa gastada' });
+  });
+});

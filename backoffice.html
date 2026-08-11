@@ -214,6 +214,10 @@
       </a>
 
       <div class="section-title">Mantenimiento</div>
+      <a onclick="showPage('mantenimientos', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        Mantenimientos
+      </a>
       <a onclick="showPage('ordenes', this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
         Registros de Mant.
@@ -378,6 +382,34 @@
         </div>
       </div>
 
+      <!-- ============ PAGE: MANTENIMIENTOS PLANIFICADOS ============ -->
+      <div id="page-mantenimientos" class="page">
+        <div class="stats" style="grid-template-columns:repeat(2,1fr);">
+          <div class="stat-card"><div class="label">Pendientes</div><div class="value" style="color:#f0a500;" id="mant-tile-pendientes">-</div></div>
+          <div class="stat-card"><div class="label">Completados</div><div class="value" style="color:#28a745;" id="mant-tile-completados">-</div></div>
+        </div>
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Mantenimientos <span id="mants-total" style="font-weight:400;color:#888;font-size:13px;"></span></h3>
+            <div class="actions">
+              <select id="mant-filtro-maquina" class="search-input" style="width:auto;" onchange="renderMantenimientos()"><option value="">Todas las maquinas</option></select>
+              <select id="mant-filtro-estado" class="search-input" style="width:auto;" onchange="renderMantenimientos()">
+                <option value="">Todos los estados</option>
+                <option>Pendiente</option>
+                <option>Completado</option>
+              </select>
+              <button class="btn btn-primary" onclick="abrirModalMant()">+ Nuevo Mantenimiento</button>
+            </div>
+          </div>
+          <table>
+            <thead><tr><th>Titulo</th><th>Maquina</th><th style="text-align:center;">Items</th><th>Estado</th><th>Creado</th><th>Completado</th><th>Acciones</th></tr></thead>
+            <tbody id="mants-tbody">
+              <tr><td colspan="7" style="text-align:center;color:#888;padding:20px;">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- ============ PAGE: TAREAS PREVENTIVAS ============ -->
       <div id="page-tareas" class="page">
         <div class="stats" style="grid-template-columns:repeat(4,1fr);">
@@ -452,7 +484,7 @@
             </div>
           </div>
           <table>
-            <thead><tr><th>Nombre</th><th>DNI</th><th>Rol</th><th>Acceso</th><th>Estado</th></tr></thead>
+            <thead><tr><th>Nombre</th><th>DNI</th><th>Rol</th><th>Acceso</th><th>Estado</th><th></th></tr></thead>
             <tbody id="usuarios-tbody">
               <tr><td colspan="5" style="text-align:center;color:#888;padding:20px;">Cargando...</td></tr>
             </tbody>
@@ -468,7 +500,7 @@
 <div class="modal-overlay" id="modal-usuario">
   <div class="modal" style="width:440px;">
     <div class="modal-header">
-      <h3>Nuevo Usuario</h3>
+      <h3 id="modal-usuario-title">Nuevo Usuario</h3>
       <button class="modal-close" onclick="document.getElementById('modal-usuario').classList.remove('show')">&times;</button>
     </div>
     <div class="modal-body">
@@ -493,13 +525,20 @@
         <div style="font-size:12px;color:#888;margin-top:4px;">Sin tildar: la persona solo figura en los registros (ej: tecnico que hizo un trabajo) pero no puede entrar.</div>
       </div>
       <div class="form-group" id="us-pin-group" style="display:none;">
-        <label>PIN inicial</label>
+        <label>PIN</label>
         <input type="text" id="us-pin" value="000000" inputmode="numeric">
+      </div>
+      <div class="form-group" id="us-estado-group" style="display:none;">
+        <label>Estado</label>
+        <select id="us-estado">
+          <option>Activo</option>
+          <option>Inactivo</option>
+        </select>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="document.getElementById('modal-usuario').classList.remove('show')">Cancelar</button>
-      <button class="btn btn-primary" onclick="guardarUsuario()">Crear Usuario</button>
+      <button class="btn btn-primary" id="btn-guardar-usuario" onclick="guardarUsuario()">Crear Usuario</button>
     </div>
   </div>
 </div>
@@ -719,6 +758,74 @@
   </div>
 </div>
 
+<!-- Modal: Nuevo Mantenimiento -->
+<div class="modal-overlay" id="modal-mant">
+  <div class="modal" style="width:640px;">
+    <div class="modal-header">
+      <h3>Nuevo Mantenimiento</h3>
+      <button class="modal-close" onclick="document.getElementById('modal-mant').classList.remove('show')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Maquina</label>
+        <select id="mant-maquina" onchange="mantMaquinaCambio()"><option value="">Seleccionar maquina...</option></select>
+      </div>
+      <div class="form-group">
+        <label>Titulo</label>
+        <input type="text" id="mant-titulo" placeholder="Ej: Mantenimiento VE serie 989">
+      </div>
+      <div style="display:flex;gap:10px;">
+        <div class="form-group" style="flex:1;">
+          <label>Horas de marcha</label>
+          <input type="text" id="mant-horas" placeholder="Ej: 6.222 hs">
+        </div>
+        <div class="form-group" style="flex:1;">
+          <label>Horas de marcha turbinas</label>
+          <input type="text" id="mant-horasturb" placeholder="Ej: 7.724 hs">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Conjuntos y tareas</label>
+        <div id="mant-items-list"></div>
+        <button class="btn-add-sm" onclick="mantAddItem()">+ Agregar fila</button>
+        <datalist id="tareas-sugeridas"></datalist>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="document.getElementById('modal-mant').classList.remove('show')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarMantenimiento()">Crear Mantenimiento</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Completar / avanzar Mantenimiento -->
+<div class="modal-overlay" id="modal-mant-comp">
+  <div class="modal" style="width:680px;">
+    <div class="modal-header">
+      <h3 id="mant-comp-title">Completar Mantenimiento</h3>
+      <button class="modal-close" onclick="document.getElementById('modal-mant-comp').classList.remove('show')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="mant-comp-items"></div>
+      <div style="display:flex;gap:10px;margin-top:12px;">
+        <div class="form-group" style="flex:1;">
+          <label>Responsable general (para el historial)</label>
+          <select id="mant-comp-tecnico"><option value="">Seleccionar...</option></select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Observaciones generales</label>
+        <textarea id="mant-comp-obs" rows="2" placeholder="Opcional..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="document.getElementById('modal-mant-comp').classList.remove('show')">Cancelar</button>
+      <button class="btn btn-outline" onclick="guardarAvanceMant()">Guardar avance</button>
+      <button class="btn btn-primary" onclick="completarMant()">Completar mantenimiento</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: Detalle de Registro -->
 <div class="modal-overlay" id="modal-detalle">
   <div class="modal" style="width:560px;">
@@ -856,14 +963,14 @@ function quickLogin(id, pin) {
 document.getElementById('login-pin').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
 // Navigation
-const pageLoaders = { dashboard: loadDashboard, equipos: loadEquipos, ordenes: loadRegistros, calendario: loadCalendario, tareas: loadTareas, repuestos: loadRepuestos, usuarios: loadUsuarios };
+const pageLoaders = { dashboard: loadDashboard, equipos: loadEquipos, mantenimientos: loadMantenimientos, ordenes: loadRegistros, calendario: loadCalendario, tareas: loadTareas, repuestos: loadRepuestos, usuarios: loadUsuarios };
 
 function showPage(page, el) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.sidebar a').forEach(a => a.classList.remove('active'));
   document.getElementById('page-' + page).classList.add('active');
   if (el) el.classList.add('active');
-  const titles = { dashboard:'Dashboard', equipos:'Maquinas / Activos', ordenes:'Registros de Mantenimiento', calendario:'Calendario de Mantenimientos', tareas:'Tareas Preventivas', repuestos:'Inventario de Repuestos', usuarios:'Tecnicos & Usuarios' };
+  const titles = { dashboard:'Dashboard', equipos:'Maquinas / Activos', mantenimientos:'Mantenimientos', ordenes:'Registros de Mantenimiento', calendario:'Calendario de Mantenimientos', tareas:'Tareas Preventivas', repuestos:'Inventario de Repuestos', usuarios:'Tecnicos & Usuarios' };
   document.getElementById('page-title').textContent = titles[page] || 'Dashboard';
   if (pageLoaders[page]) pageLoaders[page]();
 }
@@ -1249,6 +1356,257 @@ function verDetalleRegistro(id) {
   document.getElementById('modal-detalle').classList.add('show');
 }
 
+// =========== Mantenimientos planificados ===========
+let mantsAll = [], mantMaquinas = [], mantUsuarios = [], mantSugeridas = [], mantItemCounter = 0, mantCompId = null;
+
+async function loadMantenimientos() {
+  const [mants, maquinas, usuarios, sugeridas] = await Promise.all([
+    api('/mantenimientos'), api('/maquinas'), api('/usuarios'), api('/tareas-sugeridas')
+  ]);
+  if (!mants) return;
+  mantsAll = mants;
+  mantMaquinas = maquinas || [];
+  mantUsuarios = usuarios || [];
+  mantSugeridas = sugeridas || [];
+
+  const selMaq = document.getElementById('mant-filtro-maquina');
+  const maqActual = selMaq.value;
+  selMaq.innerHTML = '<option value="">Todas las maquinas</option>' +
+    mantMaquinas.map(m => `<option value="${m.id}" ${m.id === maqActual ? 'selected' : ''}>${m.nombre} (${m.id})</option>`).join('');
+  document.getElementById('tareas-sugeridas').innerHTML = mantSugeridas.map(t => `<option value="${t}">`).join('');
+
+  renderMantenimientos();
+}
+
+function renderMantenimientos() {
+  const maq = document.getElementById('mant-filtro-maquina').value;
+  const estado = document.getElementById('mant-filtro-estado').value;
+  const items = mantsAll.filter(m => (!maq || m.maquina_id === maq) && (!estado || m.estado === estado));
+
+  document.getElementById('mant-tile-pendientes').textContent = mantsAll.filter(m => m.estado === 'Pendiente').length;
+  document.getElementById('mant-tile-completados').textContent = mantsAll.filter(m => m.estado === 'Completado').length;
+  document.getElementById('mants-total').textContent = `· ${items.length} mantenimientos`;
+
+  const esAdmin = currentUser?.rol === 'Administrador';
+  const tbody = document.getElementById('mants-tbody');
+  if (!items.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px;">Sin mantenimientos. Cree el primero con "+ Nuevo Mantenimiento".</td></tr>';
+    return;
+  }
+  const fmtDate = d => d ? d.split(' ')[0].split('-').reverse().join('/') : '-';
+  tbody.innerHTML = items.map(m => `<tr>
+    <td><strong>${m.titulo}</strong>${m.horas_marcha ? `<div style="font-size:12px;color:#888;">Horas: ${m.horas_marcha}${m.horas_turbinas ? ' · Turbinas: ' + m.horas_turbinas : ''}</div>` : ''}</td>
+    <td style="white-space:nowrap;">${m.maquina_id}</td>
+    <td style="text-align:center;">${(m.items || []).length}</td>
+    <td><span class="badge ${m.estado === 'Pendiente' ? 'badge-yellow' : 'badge-green'}">${m.estado}</span></td>
+    <td style="white-space:nowrap;color:#888;">${fmtDate(m.created_at)}</td>
+    <td style="white-space:nowrap;color:#888;">${fmtDate(m.fecha_completado)}</td>
+    <td style="white-space:nowrap;">
+      <button class="btn btn-outline btn-sm" onclick="imprimirMantenimiento(${m.id})">Hoja</button>
+      ${m.estado === 'Pendiente' ? `<button class="btn btn-primary btn-sm" style="margin-left:4px;" onclick="abrirModalMantComp(${m.id})">Completar</button>` : ''}
+      ${m.estado === 'Pendiente' && esAdmin ? `<button class="btn btn-sm" style="margin-left:4px;background:#f8d7da;color:#721c24;" onclick="eliminarMantenimiento(${m.id})">Eliminar</button>` : ''}
+    </td>
+  </tr>`).join('');
+}
+
+// --- Crear ---
+function abrirModalMant() {
+  mantItemCounter = 0;
+  document.getElementById('mant-items-list').innerHTML = '';
+  document.getElementById('mant-titulo').value = '';
+  document.getElementById('mant-horas').value = '';
+  document.getElementById('mant-horasturb').value = '';
+  const selMaq = document.getElementById('mant-maquina');
+  selMaq.innerHTML = '<option value="">Seleccionar maquina...</option>' +
+    mantMaquinas.map(m => `<option value="${m.id}">${m.nombre} (${m.id})</option>`).join('');
+  document.getElementById('modal-mant').classList.add('show');
+}
+
+function mantMaquinaCambio() {
+  mantItemCounter = 0;
+  document.getElementById('mant-items-list').innerHTML = '';
+  const maq = mantMaquinas.find(m => m.id === document.getElementById('mant-maquina').value);
+  const titulo = document.getElementById('mant-titulo');
+  if (maq && !titulo.value) titulo.value = 'Mantenimiento ' + maq.nombre.split(' - ')[0];
+  if (maq) mantAddItem();
+}
+
+function mantComponentes() {
+  const maq = mantMaquinas.find(m => m.id === document.getElementById('mant-maquina').value);
+  return maq?.componentes || [];
+}
+
+function mantAddItem() {
+  const comps = mantComponentes();
+  if (!document.getElementById('mant-maquina').value) { alert('Seleccione una maquina primero'); return; }
+  if (!comps.length) { alert('La maquina no tiene conjuntos cargados'); return; }
+
+  const secciones = [...new Set(comps.map(c => c.seccion).filter(Boolean))];
+  const idx = mantItemCounter++;
+  const div = document.createElement('div');
+  div.className = 'mant-item-row';
+  div.id = `mant-item-${idx}`;
+  div.style.cssText = 'display:flex;gap:6px;margin-bottom:6px;align-items:center;';
+
+  const conjuntoSel = secciones.length
+    ? `<select id="mant-item-secc-${idx}" style="flex:0 0 110px;" onchange="mantCargarConjuntos(${idx})">
+        <option value="">Seccion...</option>${secciones.map(s => `<option value="${s}">${s}</option>`).join('')}
+      </select>
+      <select id="mant-item-comp-${idx}" style="flex:1;"><option value="">Conjunto...</option></select>`
+    : `<select id="mant-item-comp-${idx}" style="flex:1;">
+        <option value="">Conjunto...</option>${comps.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('')}
+      </select>`;
+
+  div.innerHTML = `${conjuntoSel}
+    <input type="text" id="mant-item-tarea-${idx}" list="tareas-sugeridas" placeholder="Tarea (ej: limpieza)" style="flex:0 0 180px;">
+    <button class="btn-remove-sm" onclick="document.getElementById('mant-item-${idx}').remove()">&times;</button>`;
+  document.getElementById('mant-items-list').appendChild(div);
+}
+
+function mantCargarConjuntos(idx) {
+  const secc = document.getElementById(`mant-item-secc-${idx}`).value;
+  const comps = mantComponentes().filter(c => c.seccion === secc);
+  document.getElementById(`mant-item-comp-${idx}`).innerHTML =
+    '<option value="">Conjunto...</option>' + comps.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+}
+
+async function guardarMantenimiento() {
+  const maquinaId = document.getElementById('mant-maquina').value;
+  const titulo = document.getElementById('mant-titulo').value.trim();
+  if (!maquinaId || !titulo) { alert('Complete maquina y titulo'); return; }
+
+  const items = [];
+  let incompleto = false;
+  document.querySelectorAll('#mant-items-list .mant-item-row').forEach((row, i) => {
+    const compSel = row.querySelector('select[id^="mant-item-comp-"]');
+    const tarea = row.querySelector('input[id^="mant-item-tarea-"]').value.trim();
+    if (!compSel.value || !tarea) { incompleto = true; return; }
+    items.push({ componente_id: parseInt(compSel.value), tarea, orden: i + 1 });
+  });
+  if (incompleto) { alert('Hay filas sin conjunto o sin tarea'); return; }
+  if (!items.length) { alert('Agregue al menos una fila'); return; }
+
+  const res = await api('/mantenimientos', { method: 'POST', body: JSON.stringify({
+    maquina_id: maquinaId, titulo,
+    horas_marcha: document.getElementById('mant-horas').value.trim() || null,
+    horas_turbinas: document.getElementById('mant-horasturb').value.trim() || null,
+    items
+  })});
+  if (res && !res.error) {
+    document.getElementById('modal-mant').classList.remove('show');
+    loadMantenimientos();
+  } else { alert(res?.error || 'Error al crear'); }
+}
+
+// --- Hoja imprimible ---
+function imprimirMantenimiento(id) {
+  const m = mantsAll.find(x => x.id === id);
+  if (!m) return;
+  const maq = mantMaquinas.find(x => x.id === m.maquina_id);
+  const fmtDate = d => d ? d.split(' ')[0].split('-').reverse().join('/') : '';
+  const filas = (m.items || []).map(it => `<tr>
+    <td>${it.seccion ? it.seccion + ' — ' : ''}${it.componente_nombre}</td>
+    <td>${it.tarea}</td>
+    <td>${it.novedades || ''}</td>
+    <td>${it.mecanico_nombre || ''}</td>
+    <td>${fmtDate(it.fecha)}</td>
+  </tr>`).join('');
+
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html><head><title>${m.titulo}</title><style>
+    body { font-family: Arial, sans-serif; margin: 24px; color: #111; }
+    h1 { text-align: center; font-size: 18px; text-transform: uppercase; margin-bottom: 4px; }
+    .sub { display: flex; justify-content: space-between; font-size: 12px; margin: 14px 0 8px; font-weight: bold; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { border: 1px solid #333; padding: 6px 8px; text-align: left; }
+    th { background: #f0f0f0; }
+    td:nth-child(3) { width: 22%; } td:nth-child(4) { width: 12%; } td:nth-child(5) { width: 10%; }
+    tr { height: 28px; }
+  </style></head><body>
+    <h1>Mantenimiento preventivo — ${maq ? maq.nombre : m.maquina_id}</h1>
+    <div class="sub">
+      <span>${m.titulo}</span>
+      <span>Cantidad de horas de marcha: ${m.horas_marcha || '________'}</span>
+      <span>Horas de marcha turbinas: ${m.horas_turbinas || '________'}</span>
+    </div>
+    <table>
+      <thead><tr><th>Mantenimiento preventivo</th><th>Tarea</th><th>Novedades</th><th>Mecanico</th><th>Fecha</th></tr></thead>
+      <tbody>${filas}</tbody>
+    </table>
+    <script>window.onload = () => window.print();<\/script>
+  </body></html>`);
+  w.document.close();
+}
+
+// --- Completar / avance ---
+function abrirModalMantComp(id) {
+  mantCompId = id;
+  const m = mantsAll.find(x => x.id === id);
+  if (!m) return;
+  document.getElementById('mant-comp-title').textContent = `${m.titulo} — ${m.maquina_id}`;
+  document.getElementById('mant-comp-obs').value = '';
+
+  const activos = mantUsuarios.filter(u => u.estado === 'Activo');
+  const opciones = activos.map(u => `<option value="${u.id}">${u.nombre} (${u.rol})</option>`).join('');
+  document.getElementById('mant-comp-tecnico').innerHTML = '<option value="">Seleccionar...</option>' + opciones;
+
+  const hoy = new Date().toISOString().slice(0, 10);
+  document.getElementById('mant-comp-items').innerHTML = (m.items || []).map(it => `
+    <div class="tarea-card" data-item-id="${it.id}">
+      <div class="tarea-nombre">${it.seccion ? it.seccion + ' — ' : ''}${it.componente_nombre}</div>
+      <div class="tarea-desc">${it.tarea}</div>
+      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+        <select class="mant-it-mecanico" style="flex:1;min-width:150px;">
+          <option value="">Mecanico...</option>${opciones.replace(`value="${it.mecanico_id || ''}"`, `value="${it.mecanico_id || ''}" selected`)}
+        </select>
+        <input type="text" class="mant-it-novedades" placeholder="Novedades (opcional)" value="${it.novedades || ''}" style="flex:2;min-width:180px;">
+        <input type="date" class="mant-it-fecha" value="${it.fecha ? it.fecha.slice(0, 10) : hoy}" style="flex:0 0 140px;">
+      </div>
+    </div>`).join('');
+
+  document.getElementById('modal-mant-comp').classList.add('show');
+}
+
+function mantCompItemsPayload() {
+  return [...document.querySelectorAll('#mant-comp-items [data-item-id]')].map(card => ({
+    item_id: parseInt(card.dataset.itemId),
+    mecanico_id: card.querySelector('.mant-it-mecanico').value,
+    novedades: card.querySelector('.mant-it-novedades').value.trim(),
+    fecha: card.querySelector('.mant-it-fecha').value
+  }));
+}
+
+async function guardarAvanceMant() {
+  const res = await api('/mantenimientos/' + mantCompId, { method: 'PUT', body: JSON.stringify({ items: mantCompItemsPayload() }) });
+  if (res && !res.error) {
+    document.getElementById('modal-mant-comp').classList.remove('show');
+    loadMantenimientos();
+  } else { alert(res?.error || 'Error al guardar'); }
+}
+
+async function completarMant() {
+  const tecnicoId = document.getElementById('mant-comp-tecnico').value;
+  if (!tecnicoId) { alert('Seleccione el responsable general'); return; }
+  if (!confirm('Se va a completar el mantenimiento y generar el registro en el historial. ¿Continuar?')) return;
+
+  const res = await api('/mantenimientos/' + mantCompId + '/completar', { method: 'POST', body: JSON.stringify({
+    tecnico_id: tecnicoId,
+    observaciones: document.getElementById('mant-comp-obs').value.trim() || null,
+    items: mantCompItemsPayload()
+  })});
+  if (res && !res.error) {
+    document.getElementById('modal-mant-comp').classList.remove('show');
+    loadMantenimientos();
+  } else { alert(res?.error || 'Error al completar'); }
+}
+
+async function eliminarMantenimiento(id) {
+  if (!confirm('¿Eliminar este mantenimiento pendiente?')) return;
+  const res = await api('/mantenimientos/' + id, { method: 'DELETE' });
+  if (res && !res.error) loadMantenimientos();
+  else alert(res?.error || 'Error al eliminar');
+}
+
 // =========== Tareas Preventivas ===========
 let tareasAll = [], tareaMaquinas = [], tareaUsuarios = [], tareaEditandoId = null;
 
@@ -1374,9 +1732,13 @@ async function tareaToggleActiva(id, activa) {
 }
 
 // Usuarios
+let usuariosAll = [], usuarioEditandoId = null;
+
 async function loadUsuarios() {
   const usuarios = await api('/usuarios');
   if (!usuarios) return;
+  usuariosAll = usuarios;
+  const esAdmin = currentUser?.rol === 'Administrador';
   const tbody = document.getElementById('usuarios-tbody');
   tbody.innerHTML = usuarios.map(u => {
     const rolClass = u.rol === 'Data Entry' ? 'badge-blue' : u.rol === 'Tecnico' ? 'badge-gray' : '';
@@ -1389,21 +1751,35 @@ async function loadUsuarios() {
       <td><span class="badge ${rolClass}" ${u.rol === 'Administrador' ? 'style="background:#0f3460;color:white;"' : ''}>${u.rol}</span></td>
       <td>${acceso}</td>
       <td><span class="badge ${u.estado === 'Activo' ? 'badge-green' : 'badge-red'}">${u.estado}</span></td>
+      <td>${esAdmin ? `<button class="btn btn-outline btn-sm" onclick="abrirModalUsuario('${u.id}')">Editar</button>` : ''}</td>
     </tr>`;
   }).join('');
 }
 
-// Usuarios: crear
-function abrirModalUsuario() {
-  document.getElementById('us-nombre').value = '';
-  document.getElementById('us-dni').value = '';
-  document.getElementById('us-rol').value = '';
-  document.getElementById('us-acceso').checked = false;
-  document.getElementById('us-pin').value = '000000';
-  document.getElementById('us-pin-group').style.display = 'none';
+// Usuarios: crear / editar (mismo modal; id presente = edicion)
+function abrirModalUsuario(id) {
+  usuarioEditandoId = id || null;
+  const u = id ? usuariosAll.find(x => x.id === id) : null;
+
+  document.getElementById('modal-usuario-title').textContent = u ? 'Editar Usuario' : 'Nuevo Usuario';
+  document.getElementById('btn-guardar-usuario').textContent = u ? 'Guardar cambios' : 'Crear Usuario';
+  document.getElementById('us-nombre').value = u?.nombre || '';
+  const dniInput = document.getElementById('us-dni');
+  dniInput.value = u?.id || '';
+  dniInput.readOnly = !!u;
+  dniInput.style.background = u ? '#f1f5f9' : '';
+  document.getElementById('us-rol').value = u?.rol || '';
+  document.getElementById('us-acceso').checked = !!u?.puede_ingresar;
+  const pinInput = document.getElementById('us-pin');
+  pinInput.value = u ? '' : '000000';
+  pinInput.placeholder = u ? '(dejar vacio para no cambiarlo)' : '';
+  document.getElementById('us-pin-group').style.display = (u ? u.puede_ingresar : false) ? '' : 'none';
+  document.getElementById('us-estado-group').style.display = u ? '' : 'none';
+  document.getElementById('us-estado').value = u?.estado || 'Activo';
+
   // El datalist de roles se arma con los roles ya existentes (y se puede tipear uno nuevo)
   api('/usuarios').then(usuarios => {
-    const roles = [...new Set((usuarios || []).map(u => u.rol))];
+    const roles = [...new Set((usuarios || []).map(x => x.rol))];
     document.getElementById('roles-list').innerHTML = roles.map(r => `<option value="${r}">`).join('');
   });
   document.getElementById('modal-usuario').classList.add('show');
@@ -1421,15 +1797,31 @@ async function guardarUsuario() {
   const acceso = document.getElementById('us-acceso').checked;
   const pin = document.getElementById('us-pin').value.trim();
   if (!nombre || !dni || !rol) { alert('Complete nombre, DNI y rol'); return; }
-  if (acceso && !pin) { alert('Un usuario con acceso necesita PIN'); return; }
 
-  const res = await api('/usuarios', { method: 'POST', body: JSON.stringify({
-    id: dni, nombre, rol, pin: acceso ? pin : '', puede_ingresar: acceso
-  })});
+  let res;
+  if (usuarioEditandoId) {
+    const u = usuariosAll.find(x => x.id === usuarioEditandoId);
+    const data = {};
+    if (nombre !== u.nombre) data.nombre = nombre;
+    if (rol !== u.rol) data.rol = rol;
+    if (acceso !== u.puede_ingresar) data.puede_ingresar = acceso;
+    if (pin) data.pin = pin; // vacio = no cambiar
+    const estado = document.getElementById('us-estado').value;
+    if (estado !== u.estado) data.estado = estado;
+    if (acceso && !u.puede_ingresar && !pin) { alert('Para darle acceso necesita un PIN'); return; }
+    if (!Object.keys(data).length) { document.getElementById('modal-usuario').classList.remove('show'); return; }
+    res = await api('/usuarios/' + encodeURIComponent(usuarioEditandoId), { method: 'PUT', body: JSON.stringify(data) });
+  } else {
+    if (acceso && !pin) { alert('Un usuario con acceso necesita PIN'); return; }
+    res = await api('/usuarios', { method: 'POST', body: JSON.stringify({
+      id: dni, nombre, rol, pin: acceso ? pin : '', puede_ingresar: acceso
+    })});
+  }
+
   if (res && !res.error) {
     document.getElementById('modal-usuario').classList.remove('show');
     loadUsuarios();
-  } else { alert(res?.error || 'Error al crear usuario'); }
+  } else { alert(res?.error || 'Error al guardar usuario'); }
 }
 
 // Maquinas: crear / editar

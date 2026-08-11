@@ -20,12 +20,18 @@ var sqliteMigration002 string
 //go:embed migrations/002_tareas.sql
 var sqlserverMigration002 string
 
+//go:embed migrations/003_mantenimientos_sqlite.sql
+var sqliteMigration003 string
+
+//go:embed migrations/003_mantenimientos.sql
+var sqlserverMigration003 string
+
 func Migrate(database *sql.DB, dialect Dialect) {
 	var migration string
 	if dialect.Type == SQLite {
-		migration = sqliteMigration + "\n;\n" + sqliteMigration002
+		migration = sqliteMigration + "\n;\n" + sqliteMigration002 + "\n;\n" + sqliteMigration003
 	} else {
-		migration = sqlserverMigration + "\n;\n" + sqlserverMigration002
+		migration = sqlserverMigration + "\n;\n" + sqlserverMigration002 + "\n;\n" + sqlserverMigration003
 	}
 
 	for _, stmt := range splitStatements(migration) {

@@ -60,6 +60,7 @@ func main() {
 	usuarioH := &handlers.UsuarioHandler{DB: database, D: dialect}
 	dashboardH := &handlers.DashboardHandler{DB: database, D: dialect}
 	tareaH := &handlers.TareaHandler{DB: database, D: dialect}
+	mantH := &handlers.MantenimientoHandler{DB: database, D: dialect}
 
 	// Health check (liveness + readiness con ping a DB)
 	r.GET("/health", func(c *gin.Context) {
@@ -77,6 +78,7 @@ func main() {
 	r.GET("/api/maquinas/:id", maquinaH.Get)
 	r.GET("/api/maquinas/:id/registros", registroH.ListByMaquina)
 	r.GET("/api/maquinas/:id/tareas", tareaH.ListByMaquina)
+	r.GET("/api/maquinas/:id/mantenimientos", mantH.ListByMaquina)
 
 	// Protected routes
 	api := r.Group("/api")
@@ -105,6 +107,15 @@ func main() {
 		api.POST("/tareas", tareaH.Create)
 		api.PUT("/tareas/:id", tareaH.Update)
 		api.DELETE("/tareas/:id", middleware.RequireRole("Administrador"), tareaH.Delete)
+
+		// Mantenimientos planificados (ordenes de trabajo)
+		api.GET("/mantenimientos", mantH.List)
+		api.POST("/mantenimientos", mantH.Create)
+		api.GET("/mantenimientos/:id", mantH.Get)
+		api.PUT("/mantenimientos/:id", mantH.Update)
+		api.POST("/mantenimientos/:id/completar", mantH.Completar)
+		api.DELETE("/mantenimientos/:id", middleware.RequireRole("Administrador"), mantH.Delete)
+		api.GET("/tareas-sugeridas", mantH.TareasSugeridas)
 
 		// Registros de mantenimiento
 		api.GET("/registros", registroH.List)
