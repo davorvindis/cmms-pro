@@ -762,7 +762,7 @@
 <div class="modal-overlay" id="modal-mant">
   <div class="modal" style="width:640px;">
     <div class="modal-header">
-      <h3>Nuevo Mantenimiento</h3>
+      <h3 id="modal-mant-title">Nuevo Mantenimiento</h3>
       <button class="modal-close" onclick="document.getElementById('modal-mant').classList.remove('show')">&times;</button>
     </div>
     <div class="modal-body">
@@ -806,7 +806,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="document.getElementById('modal-mant').classList.remove('show')">Cancelar</button>
-      <button class="btn btn-primary" onclick="guardarMantenimiento()">Crear Mantenimiento</button>
+      <button class="btn btn-primary" id="btn-guardar-mant" onclick="guardarMantenimiento()">Crear Mantenimiento</button>
     </div>
   </div>
 </div>
@@ -1416,30 +1416,62 @@ function renderMantenimientos() {
     <td style="white-space:nowrap;color:#888;">${fmtDate(m.fecha_completado)}</td>
     <td style="white-space:nowrap;">
       <button class="btn btn-outline btn-sm" onclick="imprimirMantenimiento(${m.id})">Hoja</button>
+      ${m.estado === 'Pendiente' ? `<button class="btn btn-outline btn-sm" style="margin-left:4px;" onclick="abrirModalMant(${m.id})">Editar</button>` : ''}
       ${m.estado === 'Pendiente' ? `<button class="btn btn-primary btn-sm" style="margin-left:4px;" onclick="abrirModalMantComp(${m.id})">Completar</button>` : ''}
       ${m.estado === 'Pendiente' && esAdmin ? `<button class="btn btn-sm" style="margin-left:4px;background:#f8d7da;color:#721c24;" onclick="eliminarMantenimiento(${m.id})">Eliminar</button>` : ''}
     </td>
   </tr>`).join('');
 }
 
-// --- Crear ---
-function abrirModalMant() {
-  mantItemCounter = 0;
-  document.getElementById('mant-items-list').innerHTML = '';
-  document.getElementById('mant-titulo').value = '';
-  document.getElementById('mant-horas').value = '';
-  document.getElementById('mant-horasturb').value = '';
-  const selMaq = document.getElementById('mant-maquina');
-  selMaq.innerHTML = '<option value="">Seleccionar maquina...</option>' +
-    mantMaquinas.map(m => `<option value="${m.id}">${m.nombre} (${m.id})</option>`).join('');
-  document.getElementById('modal-mant').classList.add('show');
-}
-
+// --- Crear / Editar (mismo modal; id presente = edicion) ---
 // label visible del conjunto -> id (para resolver lo que se tipea en el buscador)
 let mantConjuntoMap = {};
+let mantEditandoId = null;
+let mantEditOriginal = {}; // item_id -> {label, tarea} para calcular el diff al guardar
 
 function mantEtiquetaConjunto(c) {
   return (c.seccion ? c.seccion + ' — ' : '') + c.nombre;
+}
+
+function mantBuildBuscador(maq) {
+  mantConjuntoMap = {};
+  (maq?.componentes || []).forEach(c => { mantConjuntoMap[mantEtiquetaConjunto(c)] = c.id; });
+  document.getElementById('mant-conjuntos-list').innerHTML =
+    Object.keys(mantConjuntoMap).map(l => `<option value="${l}">`).join('');
+}
+
+function abrirModalMant(id) {
+  mantEditandoId = id || null;
+  mantEditOriginal = {};
+  mantItemCounter = 0;
+  document.getElementById('mant-items-list').innerHTML = '';
+  document.getElementById('mant-nuevo-conj').style.display = 'none';
+
+  const m = id ? mantsAll.find(x => x.id === id) : null;
+  document.getElementById('modal-mant-title').textContent = m ? 'Editar Mantenimiento' : 'Nuevo Mantenimiento';
+  document.getElementById('btn-guardar-mant').textContent = m ? 'Guardar cambios' : 'Crear Mantenimiento';
+  document.getElementById('mant-titulo').value = m?.titulo || '';
+  document.getElementById('mant-horas').value = m?.horas_marcha || '';
+  document.getElementById('mant-horasturb').value = m?.horas_turbinas || '';
+
+  const selMaq = document.getElementById('mant-maquina');
+  selMaq.innerHTML = '<option value="">Seleccionar maquina...</option>' +
+    mantMaquinas.map(x => `<option value="${x.id}">${x.nombre} (${x.id})</option>`).join('');
+  selMaq.value = m ? m.maquina_id : '';
+  selMaq.disabled = !!m; // la maquina no se cambia al editar
+
+  if (m) {
+    mantBuildBuscador(mantMaquinas.find(x => x.id === m.maquina_id));
+    (m.items || []).forEach(it => {
+      const label = (it.seccion ? it.seccion + ' — ' : '') + it.componente_nombre;
+      const row = mantAddItem();
+      row.dataset.itemId = it.id;
+      row.querySelector('input[id^="mant-item-comp-"]').value = label;
+      row.querySelector('input[id^="mant-item-tarea-"]').value = it.tarea;
+      mantEditOriginal[it.id] = { label, tarea: it.tarea };
+    });
+  }
+  document.getElementById('modal-mant').classList.add('show');
 }
 
 function mantMaquinaCambio() {
@@ -1449,13 +1481,7 @@ function mantMaquinaCambio() {
   const titulo = document.getElementById('mant-titulo');
   if (maq && !titulo.value) titulo.value = 'Mantenimiento ' + maq.nombre.split(' - ')[0];
 
-  // Buscador: un solo datalist con todos los conjuntos de la maquina (todas las secciones)
-  mantConjuntoMap = {};
-  const comps = maq?.componentes || [];
-  comps.forEach(c => { mantConjuntoMap[mantEtiquetaConjunto(c)] = c.id; });
-  document.getElementById('mant-conjuntos-list').innerHTML =
-    Object.keys(mantConjuntoMap).map(l => `<option value="${l}">`).join('');
-
+  mantBuildBuscador(maq);
   if (maq) mantAddItem();
 }
 
@@ -1479,6 +1505,7 @@ function mantAddItem() {
     <button class="btn-remove-sm" onclick="document.getElementById('mant-item-${idx}').remove()">&times;</button>`;
   document.getElementById('mant-items-list').appendChild(div);
   div.querySelector(`#mant-item-comp-${idx}`).focus();
+  return div;
 }
 
 function mantToggleNuevoConj() {
@@ -1531,7 +1558,8 @@ async function guardarMantenimiento() {
   const titulo = document.getElementById('mant-titulo').value.trim();
   if (!maquinaId || !titulo) { alert('Complete maquina y titulo'); return; }
 
-  const items = [];
+  // Recorrer filas: nuevas (sin item_id), existentes modificadas, y detectar eliminadas
+  const nuevos = [], modificados = [], eliminar = [], vistos = new Set();
   let incompleto = false, noReconocido = null;
   document.querySelectorAll('#mant-items-list .mant-item-row').forEach((row, i) => {
     const texto = row.querySelector('input[id^="mant-item-comp-"]').value.trim();
@@ -1540,22 +1568,48 @@ async function guardarMantenimiento() {
     if (!texto || !tarea) { incompleto = true; return; }
     const compId = mantConjuntoMap[texto];
     if (!compId) { noReconocido = texto; return; }
-    items.push({ componente_id: compId, tarea, orden: i + 1 });
+
+    const itemId = row.dataset.itemId ? parseInt(row.dataset.itemId) : null;
+    if (itemId) {
+      vistos.add(itemId);
+      const orig = mantEditOriginal[itemId];
+      if (orig.label !== texto) {
+        // cambio de conjunto: se reemplaza el item
+        eliminar.push(itemId);
+        nuevos.push({ componente_id: compId, tarea, orden: i + 1 });
+      } else if (orig.tarea !== tarea) {
+        modificados.push({ item_id: itemId, tarea });
+      }
+    } else {
+      nuevos.push({ componente_id: compId, tarea, orden: i + 1 });
+    }
   });
   if (noReconocido) { alert(`Conjunto no reconocido: "${noReconocido}". Elegilo de la lista que aparece al escribir.`); return; }
   if (incompleto) { alert('Hay filas sin conjunto o sin tarea'); return; }
-  if (!items.length) { alert('Agregue al menos una fila'); return; }
 
-  const res = await api('/mantenimientos', { method: 'POST', body: JSON.stringify({
-    maquina_id: maquinaId, titulo,
-    horas_marcha: document.getElementById('mant-horas').value.trim() || null,
-    horas_turbinas: document.getElementById('mant-horasturb').value.trim() || null,
-    items
-  })});
+  let res;
+  if (mantEditandoId) {
+    Object.keys(mantEditOriginal).map(Number).forEach(id => { if (!vistos.has(id)) eliminar.push(id); });
+    if (vistos.size + nuevos.length === 0) { alert('El mantenimiento debe tener al menos una fila'); return; }
+    res = await api('/mantenimientos/' + mantEditandoId, { method: 'PUT', body: JSON.stringify({
+      titulo,
+      horas_marcha: document.getElementById('mant-horas').value.trim() || null,
+      horas_turbinas: document.getElementById('mant-horasturb').value.trim() || null,
+      items: modificados, nuevos_items: nuevos, eliminar_items: eliminar
+    })});
+  } else {
+    if (!nuevos.length) { alert('Agregue al menos una fila'); return; }
+    res = await api('/mantenimientos', { method: 'POST', body: JSON.stringify({
+      maquina_id: maquinaId, titulo,
+      horas_marcha: document.getElementById('mant-horas').value.trim() || null,
+      horas_turbinas: document.getElementById('mant-horasturb').value.trim() || null,
+      items: nuevos
+    })});
+  }
   if (res && !res.error) {
     document.getElementById('modal-mant').classList.remove('show');
     loadMantenimientos();
-  } else { alert(res?.error || 'Error al crear'); }
+  } else { alert(res?.error || 'Error al guardar'); }
 }
 
 // --- Hoja imprimible ---

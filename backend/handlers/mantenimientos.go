@@ -248,7 +248,7 @@ func (h *MantenimientoHandler) Update(c *gin.Context) {
 		return
 	}
 
-	estado, _, err := h.getEstado(id)
+	estado, maquinaID, err := h.getEstado(id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Mantenimiento no encontrado"})
 		return
@@ -256,6 +256,16 @@ func (h *MantenimientoHandler) Update(c *gin.Context) {
 	if estado == "Completado" {
 		c.JSON(http.StatusConflict, gin.H{"error": "El mantenimiento ya esta completado"})
 		return
+	}
+
+	// Validar conjuntos nuevos antes de abrir la tx
+	checkComp := fmt.Sprintf("SELECT COUNT(*) FROM Componentes WHERE id = %s AND maquina_id = %s", h.D.Param(1), h.D.Param(2))
+	for _, it := range req.NuevosItems {
+		var count int
+		if err := h.DB.QueryRow(checkComp, it.ComponenteID, maquinaID).Scan(&count); err != nil || count == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("El conjunto %d no pertenece a la maquina %s", it.ComponenteID, maquinaID)})
+			return
+		}
 	}
 
 	tx, err := h.DB.Begin()
@@ -288,6 +298,24 @@ func (h *MantenimientoHandler) Update(c *gin.Context) {
 	if err := h.applyItems(tx, id, req.Items); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar items", "detail": err.Error()})
 		return
+	}
+
+	deleteItem := fmt.Sprintf("DELETE FROM MantenimientoItems WHERE id = %s AND mantenimiento_id = %s", h.D.Param(1), h.D.Param(2))
+	for _, itemID := range req.EliminarItems {
+		if _, err := tx.Exec(deleteItem, itemID, id); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al eliminar item", "detail": err.Error()})
+			return
+		}
+	}
+
+	insertItem := fmt.Sprintf(
+		"INSERT INTO MantenimientoItems (mantenimiento_id, componente_id, tarea, orden) VALUES (%s, %s, %s, %s)",
+		h.D.Param(1), h.D.Param(2), h.D.Param(3), h.D.Param(4))
+	for _, it := range req.NuevosItems {
+		if _, err := tx.Exec(insertItem, id, it.ComponenteID, it.Tarea, it.Orden); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al agregar item", "detail": err.Error()})
+			return
+		}
 	}
 
 	if err := tx.Commit(); err != nil {

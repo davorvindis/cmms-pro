@@ -859,3 +859,34 @@ test.describe('Mantenimientos — crear conjunto inline', () => {
     expect(JSON.parse(createReq.postData() || '{}').items[0]).toMatchObject({ componente_id: 77, tarea: 'limpieza' });
   });
 });
+
+test.describe('Mantenimientos — editar', () => {
+  test('editar precarga filas y manda diff de modificados/eliminados/nuevos', async ({ page }) => {
+    await openBackoffice(page);
+    await page.click('nav >> text=Mantenimientos');
+    await page.locator('#mants-tbody tr:has-text("Pendiente") button:has-text("Editar")').click();
+    await expect(page.locator('#modal-mant')).toHaveClass(/show/);
+    await expect(page.locator('#modal-mant-title')).toHaveText('Editar Mantenimiento');
+    await expect(page.locator('#mant-maquina')).toBeDisabled();
+    await expect(page.locator('#mant-items-list .mant-item-row')).toHaveCount(2);
+    await expect(page.locator('#mant-titulo')).toHaveValue('Mantenimiento VE serie 989');
+
+    // Cambiar tarea de la fila 1 (item 11), borrar fila 2 (item 12), agregar una nueva
+    const filas = page.locator('#mant-items-list .mant-item-row');
+    await filas.nth(0).locator('input[id^="mant-item-tarea-"]').fill('lubricacion');
+    await filas.nth(1).locator('.btn-remove-sm').click();
+    await page.click('button:has-text("+ Agregar fila")');
+    await page.locator('#mant-items-list .mant-item-row').last().locator('input[id^="mant-item-comp-"]').fill('Motor principal');
+    await page.locator('#mant-items-list .mant-item-row').last().locator('input[id^="mant-item-tarea-"]').fill('limpieza');
+
+    const requestPromise = page.waitForRequest(
+      (req) => /\/api\/mantenimientos\/1$/.test(req.url()) && req.method() === 'PUT'
+    );
+    await page.click('#btn-guardar-mant');
+    const req = await requestPromise;
+    const payload = JSON.parse(req.postData() || '{}');
+    expect(payload.items).toEqual([{ item_id: 11, tarea: 'lubricacion' }]);
+    expect(payload.eliminar_items).toEqual([12]);
+    expect(payload.nuevos_items).toEqual([{ componente_id: 2, tarea: 'limpieza', orden: 2 }]);
+  });
+});

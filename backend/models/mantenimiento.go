@@ -59,6 +59,8 @@ type UpdateMantenimientoRequest struct {
 	HorasMarcha   *string             `json:"horas_marcha"`
 	HorasTurbinas *string             `json:"horas_turbinas"`
 	Items         []UpdateMantItemReq `json:"items"`
+	NuevosItems   []CreateMantItemReq `json:"nuevos_items"`
+	EliminarItems []int               `json:"eliminar_items"`
 }
 
 type CompletarMantenimientoRequest struct {
