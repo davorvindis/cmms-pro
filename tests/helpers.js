@@ -204,6 +204,15 @@ async function mockApi(page) {
     await route.fulfill({ contentType: 'application/json', body: JSON.stringify(maq) });
   });
 
+  // Alta de componente/conjunto (POST /maquinas/:id/componentes)
+  await page.route(/\/api\/maquinas\/[^/]+\/componentes$/, (route) => {
+    if (route.request().method() === 'POST') {
+      route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ id: 77, message: 'Componente agregado' }) });
+    } else {
+      route.fulfill({ contentType: 'application/json', body: JSON.stringify([]) });
+    }
+  });
+
   // Maquina registros (GET /maquinas/:id/registros)
   await page.route(/\/api\/maquinas\/[^/]+\/registros/, (route) =>
     route.fulfill({ contentType: 'application/json', body: JSON.stringify(FIXTURES.registros) })

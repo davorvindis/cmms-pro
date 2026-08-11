@@ -827,3 +827,35 @@ test.describe('Mantenimientos — buscador de conjuntos', () => {
     await expect(page.locator('#mant-conjuntos-list option')).toHaveCount(FIXTURES.maquinas[0].componentes.length);
   });
 });
+
+test.describe('Mantenimientos — crear conjunto inline', () => {
+  test('crea el conjunto sin salir y lo pone en la fila con el buscador actualizado', async ({ page }) => {
+    await openBackoffice(page);
+    await page.click('nav >> text=Mantenimientos');
+    await page.click('button:has-text("+ Nuevo Mantenimiento")');
+    await page.selectOption('#mant-maquina', 'MAQ-001');
+
+    await page.click('text=¿No encontras el conjunto?');
+    await page.fill('#mant-nc-nombre', 'Conjunto nuevo de prueba');
+
+    const requestPromise = page.waitForRequest(
+      (req) => /\/api\/maquinas\/MAQ-001\/componentes$/.test(req.url()) && req.method() === 'POST'
+    );
+    await page.click('#mant-nuevo-conj button:has-text("Crear")');
+    const req = await requestPromise;
+    expect(JSON.parse(req.postData() || '{}')).toMatchObject({ nombre: 'Conjunto nuevo de prueba' });
+
+    // Queda en la fila y en el datalist
+    await expect(page.locator('#mant-items-list input[id^="mant-item-comp-"]').first()).toHaveValue('Conjunto nuevo de prueba');
+    await expect(page.locator('#mant-conjuntos-list option[value="Conjunto nuevo de prueba"]')).toHaveCount(1);
+    // El payload final resuelve el id nuevo (77 del mock)
+    await page.fill('#mant-titulo', 'Prueba inline');
+    await page.fill('#mant-items-list input[id^="mant-item-tarea-"]', 'limpieza');
+    const createPromise = page.waitForRequest(
+      (r) => r.url().endsWith('/api/mantenimientos') && r.method() === 'POST'
+    );
+    await page.click('#modal-mant button:has-text("Crear Mantenimiento")');
+    const createReq = await createPromise;
+    expect(JSON.parse(createReq.postData() || '{}').items[0]).toMatchObject({ componente_id: 77, tarea: 'limpieza' });
+  });
+});
