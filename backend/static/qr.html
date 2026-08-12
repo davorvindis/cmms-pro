@@ -191,6 +191,12 @@
   .chip-res.sel { background: #0f3460; border-color: #0f3460; color: white; }
   .tarea-obs { width: 100%; margin-top: 10px; padding: 9px 12px; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 13px; font-family: inherit; }
 
+  /* Toasts */
+  #toast-cont { position: fixed; bottom: 84px; left: 16px; right: 16px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  .toast { padding: 11px 16px; border-radius: 10px; color: white; font-size: 13px; font-weight: 600; box-shadow: 0 4px 14px rgba(0,0,0,0.2); max-width: 90%; }
+  .toast-ok { background: #16a34a; } .toast-error { background: #dc2626; } .toast-info { background: #0f3460; }
+  .toast.out { opacity: 0; transition: opacity 0.3s; }
+
   /* Spacing for bottom */
   .bottom-spacer { height: 80px; }
 </style>
@@ -383,6 +389,17 @@ async function api(path, opts = {}) {
   return res.json();
 }
 
+// Notificaciones no bloqueantes
+function toast(msg, tipo = 'error') {
+  let cont = document.getElementById('toast-cont');
+  if (!cont) { cont = document.createElement('div'); cont.id = 'toast-cont'; document.body.appendChild(cont); }
+  const t = document.createElement('div');
+  t.className = 'toast toast-' + tipo;
+  t.textContent = msg;
+  cont.appendChild(t);
+  setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 350); }, 3500);
+}
+
 // La vista es publica; el login solo se pide para registrar mantenimientos.
 let accionPendiente = null;
 
@@ -524,14 +541,14 @@ async function qrGuardarAvanceMant() {
   const res = await api('/mantenimientos/' + qrMantActual.id, { method: 'PUT', body: JSON.stringify({ items: qrMantItemsPayload() }) });
   if (res && !res.error) {
     document.getElementById('form-mant').classList.remove('show');
-    alert('Avance guardado');
+    toast('Avance guardado', 'ok');
     init();
-  } else { alert(res?.error || 'Error al guardar'); }
+  } else { toast(res?.error || 'Error al guardar'); }
 }
 
 async function qrCompletarMant() {
   const tecnicoId = document.getElementById('qr-mant-tecnico').value;
-  if (!tecnicoId) { alert('Seleccione el responsable general'); return; }
+  if (!tecnicoId) { toast('Seleccione el responsable general'); return; }
   if (!confirm('Se completa el mantenimiento y se genera el registro en el historial. ¿Continuar?')) return;
 
   const res = await api('/mantenimientos/' + qrMantActual.id + '/completar', { method: 'POST', body: JSON.stringify({
@@ -541,9 +558,9 @@ async function qrCompletarMant() {
   })});
   if (res && !res.error) {
     document.getElementById('form-mant').classList.remove('show');
-    alert('Mantenimiento completado');
+    toast('Mantenimiento completado', 'ok');
     init();
-  } else { alert(res?.error || 'Error al completar'); }
+  } else { toast(res?.error || 'Error al completar'); }
 }
 
 function renderComponentesChips() {
@@ -742,9 +759,9 @@ async function qrCrearPersona() {
   const nombre = document.getElementById('qr-np-nombre').value.trim();
   const dni = document.getElementById('qr-np-dni').value.trim();
   const rol = document.getElementById('qr-np-rol').value.trim();
-  if (!nombre || !dni || !rol) { alert('Complete nombre, DNI y rol'); return; }
+  if (!nombre || !dni || !rol) { toast('Complete nombre, DNI y rol'); return; }
   const res = await api('/usuarios', { method: 'POST', body: JSON.stringify({ id: dni, nombre, rol, puede_ingresar: false }) });
-  if (!res || res.error) { alert(res?.error || 'Error al crear persona'); return; }
+  if (!res || res.error) { toast(res?.error || 'Error al crear persona'); return; }
   const usuarios = await api('/usuarios');
   qrPoblarTecnicos(usuarios || [], dni);
   document.getElementById('qr-nueva-persona').style.display = 'none';
@@ -821,10 +838,10 @@ async function qrCargarRepuestos(idx) {
 
 async function qrCrearConjunto(idx) {
   const nombre = document.getElementById(`qr-nc-nombre-${idx}`).value.trim();
-  if (!nombre) { alert('Escriba el nombre del conjunto'); return; }
+  if (!nombre) { toast('Escriba el nombre del conjunto'); return; }
   const seccion = document.getElementById(`qr-parte-secc-${idx}`)?.value || '';
   const res = await api(`/maquinas/${maquinaData.id}/componentes`, { method: 'POST', body: JSON.stringify({ nombre, seccion }) });
-  if (!res || res.error) { alert(res?.error || 'Error al crear conjunto'); return; }
+  if (!res || res.error) { toast(res?.error || 'Error al crear conjunto'); return; }
   const maq = await api('/maquinas/' + maquinaData.id);
   maquinaData = maq;
   componentesData = maq.componentes || [];
@@ -842,7 +859,7 @@ function qrOpcionesRepuesto(reps, seleccionar) {
 
 function qrAddRepuesto(idx) {
   const compId = document.getElementById(`qr-parte-sel-${idx}`).value;
-  if (!compId || compId === '__nuevo') { alert('Seleccione el conjunto primero'); return; }
+  if (!compId || compId === '__nuevo') { toast('Seleccione el conjunto primero'); return; }
   const reps = qrRepsConjuntoCache[compId] || [];
   if (!qrRepCounters[idx]) qrRepCounters[idx] = 0;
   const repIdx = qrRepCounters[idx]++;
@@ -887,13 +904,13 @@ async function qrCrearRepuesto(idx, repIdx) {
   const desc = row.querySelector('.nr-desc').value.trim();
   const codigo = row.querySelector('.nr-codigo').value.trim();
   const hauni = row.querySelector('.nr-hauni').value.trim();
-  if (!desc || !codigo) { alert('Complete descripcion y Nº de pieza'); return; }
+  if (!desc || !codigo) { toast('Complete descripcion y Nº de pieza'); return; }
   const compId = document.getElementById(`qr-parte-sel-${idx}`).value;
   const res = await api(`/maquinas/${maquinaData.id}/componentes/${compId}/repuestos`, {
     method: 'POST',
     body: JSON.stringify({ codigo, descripcion: desc, nro_hauni: hauni || null })
   });
-  if (!res || res.error) { alert(res?.error || 'Error al crear repuesto'); return; }
+  if (!res || res.error) { toast(res?.error || 'Error al crear repuesto'); return; }
   const reps = await api(`/maquinas/${maquinaData.id}/componentes/${compId}/repuestos`);
   qrRepsConjuntoCache[compId] = reps || [];
   row.querySelector('.repuesto-row select').innerHTML = qrOpcionesRepuesto(qrRepsConjuntoCache[compId], codigo);
@@ -903,7 +920,7 @@ async function qrCrearRepuesto(idx, repIdx) {
 
 async function guardarRegistroQR() {
   const tecnicoId = document.getElementById('qr-reg-tecnico').value;
-  if (!tecnicoId || tecnicoId === '__nueva') { alert('Seleccione un tecnico'); return; }
+  if (!tecnicoId || tecnicoId === '__nueva') { toast('Seleccione un tecnico'); return; }
 
   // Checklist de tareas: solo cards con al menos un tilde (si la seccion esta visible)
   const tareas = [];
@@ -940,8 +957,8 @@ async function guardarRegistroQR() {
     componentes.push({ componente_id: parseInt(compSel.value), trabajo_realizado: trabajo || null, repuestos });
   });
 
-  if (sinConjunto) { alert('Hay partes sin conjunto seleccionado'); return; }
-  if (!componentes.length && !tareas.length) { alert('Agregue una parte intervenida o complete el checklist'); return; }
+  if (sinConjunto) { toast('Hay partes sin conjunto seleccionado'); return; }
+  if (!componentes.length && !tareas.length) { toast('Agregue una parte intervenida o complete el checklist'); return; }
 
   const now = new Date();
   const fecha = now.toISOString().slice(0, 10) + ' ' + now.toTimeString().slice(0, 5);
@@ -959,10 +976,10 @@ async function guardarRegistroQR() {
 
   if (res && !res.error) {
     cerrarFormRegistro();
-    alert('Registro guardado correctamente');
+    toast('Registro guardado correctamente', 'ok');
     init();
   } else {
-    alert(res?.error || 'Error al guardar el registro');
+    toast(res?.error || 'Error al guardar el registro');
   }
 }
 

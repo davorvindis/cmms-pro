@@ -6,6 +6,7 @@ import (
 
 	"cmms-backend/db"
 	"cmms-backend/models"
+	"cmms-backend/security"
 
 	"github.com/gin-gonic/gin"
 )
@@ -21,13 +22,14 @@ func AuthRequired(database *sql.DB, dialect db.Dialect) gin.HandlerFunc {
 			return
 		}
 
-		query := "SELECT id, nombre, rol, estado FROM Usuarios WHERE id = " + dialect.Param(1) +
-			" AND pin = " + dialect.Param(2) + " AND pin <> '' AND puede_ingresar = 1 AND estado = 'Activo'"
+		query := "SELECT id, nombre, rol, pin, estado FROM Usuarios WHERE id = " + dialect.Param(1) +
+			" AND pin <> '' AND puede_ingresar = 1 AND estado = 'Activo'"
 
 		var user models.Usuario
-		err := database.QueryRow(query, userID, pin).Scan(&user.ID, &user.Nombre, &user.Rol, &user.Estado)
+		var stored string
+		err := database.QueryRow(query, userID).Scan(&user.ID, &user.Nombre, &user.Rol, &stored, &user.Estado)
 
-		if err != nil {
+		if err != nil || !security.CheckPin(stored, pin) {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Credenciales invalidas"})
 			c.Abort()
 			return

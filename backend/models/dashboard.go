@@ -6,6 +6,8 @@ type DashboardStats struct {
 	MaquinasVencidas         int `json:"maquinas_vencidas"`
 	RegistrosEsteMes         int `json:"registros_este_mes"`
 	RepuestosStockBajo       int `json:"repuestos_stock_bajo"`
+	TareasVencidas           int `json:"tareas_vencidas"`
+	MantsPlanPendientes      int `json:"mantenimientos_planificados_pendientes"`
 }
 
 type Alerta struct {

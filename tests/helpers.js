@@ -30,10 +30,10 @@ const API = 'http://localhost:8080/api';
 /** Canonical fixture data shared between both HTML files. */
 const FIXTURES = {
   users: {
-    admin: { id: 'admin', nombre: 'Admin Beto', rol: 'Administrador', estado: 'Activo' },
-    dataEntry: { id: 'maciel', nombre: 'Maciel Entry', rol: 'Data Entry', estado: 'Activo' },
-    tecnico1: { id: 'tec01', nombre: 'Carlos Gomez', rol: 'Tecnico', estado: 'Activo' },
-    tecnico2: { id: 'tec02', nombre: 'Roberto Silva', rol: 'Tecnico', estado: 'Activo' },
+    admin: { id: 'admin', nombre: 'Admin Beto', rol: 'Administrador', estado: 'Activo', puede_ingresar: false },
+    dataEntry: { id: 'maciel', nombre: 'Maciel Entry', rol: 'Data Entry', estado: 'Activo', puede_ingresar: false },
+    tecnico1: { id: 'tec01', nombre: 'Carlos Gomez', rol: 'Tecnico', estado: 'Activo', puede_ingresar: false },
+    tecnico2: { id: 'tec02', nombre: 'Roberto Silva', rol: 'Tecnico', estado: 'Activo', puede_ingresar: false },
   },
 
   maquinas: [
@@ -110,7 +110,14 @@ const FIXTURES = {
     maquinas_vencidas: 1,
     registros_este_mes: 23,
     repuestos_stock_bajo: 2,
+    tareas_vencidas: 3,
+    mantenimientos_planificados_pendientes: 1,
   },
+
+  auditoria: [
+    { id: 2, fecha: '2026-08-12 10:05', usuario_id: 'admin', usuario_nombre: 'Admin Beto', metodo: 'PUT', ruta: '/api/repuestos/ROD-001', entidad: 'repuestos', detalle: '{"stock_actual":9}' },
+    { id: 1, fecha: '2026-08-12 10:00', usuario_id: 'maciel', usuario_nombre: 'Maciel Entry', metodo: 'POST', ruta: '/api/registros', entidad: 'registros', detalle: '{"maquina_id":"MAQ-001"}' },
+  ],
 
   registros: [
     {
@@ -212,6 +219,26 @@ async function mockApi(page) {
       route.fulfill({ contentType: 'application/json', body: JSON.stringify([]) });
     }
   });
+
+  // Update / delete de un conjunto puntual
+  await page.route(/\/api\/maquinas\/[^/]+\/componentes\/\d+$/, (route) =>
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'ok' }) })
+  );
+
+  // Repuesto puntual (GET/PUT/DELETE /repuestos/:codigo)
+  await page.route(/\/api\/repuestos\/[^/?]+$/, (route) =>
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'ok' }) })
+  );
+
+  // Registro puntual (DELETE /registros/:id)
+  await page.route(/\/api\/registros\/\d+$/, (route) =>
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'ok' }) })
+  );
+
+  // Auditoria
+  await page.route(/\/api\/auditoria/, (route) =>
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify(FIXTURES.auditoria) })
+  );
 
   // Maquina registros (GET /maquinas/:id/registros)
   await page.route(/\/api\/maquinas\/[^/]+\/registros/, (route) =>

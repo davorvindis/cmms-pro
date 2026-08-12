@@ -31,6 +31,26 @@ func (h *DashboardHandler) Stats(c *gin.Context) {
 
 	h.DB.QueryRow("SELECT COUNT(*) FROM Repuestos WHERE stock_actual < stock_minimo").Scan(&stats.RepuestosStockBajo)
 
+	// Tareas vencidas: mismo calculo que la pagina de tareas (frecuencia vs ultima ejecucion)
+	qTareas := fmt.Sprintf(`SELECT t.frecuencia,
+		(SELECT %s FROM Registros r JOIN RegistroTareas rt ON rt.registro_id = r.id WHERE rt.tarea_id = t.id)
+		FROM Tareas t WHERE t.activa = 1`, h.D.DateTimeToStr("MAX(r.fecha)"))
+	if rows, err := h.DB.Query(qTareas); err == nil {
+		for rows.Next() {
+			var t models.Tarea
+			if rows.Scan(&t.Frecuencia, &t.UltimaEjecucion) != nil {
+				continue
+			}
+			computarEstado(&t)
+			if t.Estado == "vencida" {
+				stats.TareasVencidas++
+			}
+		}
+		rows.Close()
+	}
+
+	h.DB.QueryRow("SELECT COUNT(*) FROM Mantenimientos WHERE estado = 'Pendiente'").Scan(&stats.MantsPlanPendientes)
+
 	c.JSON(http.StatusOK, stats)
 }
 

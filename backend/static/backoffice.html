@@ -183,6 +183,17 @@
   }
 
   @media (max-width: 1200px) { .stats { grid-template-columns: repeat(2, 1fr); } .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+/* Toasts */
+#toast-cont { position: fixed; bottom: 18px; right: 18px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+.toast { padding: 11px 16px; border-radius: 10px; color: white; font-size: 13px; font-weight: 600; box-shadow: 0 4px 14px rgba(0,0,0,0.18); animation: toastin 0.25s ease; max-width: 340px; }
+.toast-ok { background: #16a34a; } .toast-error { background: #dc2626; } .toast-info { background: #0f3460; }
+.toast.out { opacity: 0; transition: opacity 0.3s; }
+@keyframes toastin { from { transform: translateY(8px); opacity: 0; } }
+
+/* Badges del sidebar */
+.nav-badge { margin-left: auto; background: #dc3545; color: white; border-radius: 10px; font-size: 11px; font-weight: 700; padding: 1px 7px; }
+.nav-badge.amarillo { background: #f0a500; color: #333; }
+
 /* Checklist preventivo en modal de registro */
 .tarea-card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; background: #fafbfc; }
 .tarea-card .tarea-nombre { font-size: 13px; font-weight: 700; color: #0f3460; }
@@ -217,6 +228,7 @@
       <a onclick="showPage('mantenimientos', this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
         Mantenimientos
+        <span class="nav-badge amarillo" id="badge-mants" style="display:none;"></span>
       </a>
       <a onclick="showPage('ordenes', this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
@@ -229,6 +241,7 @@
       <a onclick="showPage('tareas', this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
         Tareas Preventivas
+        <span class="nav-badge" id="badge-tareas" style="display:none;"></span>
       </a>
 
       <div class="section-title">Inventario</div>
@@ -248,6 +261,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
         Reportes
       </a>
+      <a id="nav-auditoria" style="display:none;" onclick="showPage('auditoria', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        Auditoria
+      </a>
     </nav>
   </aside>
 
@@ -265,9 +282,11 @@
 
       <!-- ============ PAGE: DASHBOARD ============ -->
       <div id="page-dashboard" class="page active">
-        <div class="stats" id="dashboard-stats">
+        <div class="stats" id="dashboard-stats" style="grid-template-columns:repeat(6,1fr);">
           <div class="stat-card"><div class="label">Maquinas Activas</div><div class="value" id="stat-maquinas">-</div></div>
           <div class="stat-card"><div class="label">Mantenimientos pendientes</div><div class="value" id="stat-pendientes">-</div><div class="change down" id="stat-vencidos"></div></div>
+          <div class="stat-card" style="cursor:pointer;" onclick="navTo('tareas')"><div class="label">Tareas vencidas</div><div class="value" style="color:#dc3545;" id="stat-tareas-vencidas">-</div><div class="change">Ver tareas →</div></div>
+          <div class="stat-card" style="cursor:pointer;" onclick="navTo('mantenimientos')"><div class="label">Mant. planificados pend.</div><div class="value" style="color:#f0a500;" id="stat-mants-pend">-</div><div class="change">Ver mantenimientos →</div></div>
           <div class="stat-card"><div class="label">Registros este mes</div><div class="value" id="stat-registros">-</div></div>
           <div class="stat-card"><div class="label">Repuestos stock bajo</div><div class="value" id="stat-stockbajo">-</div><div class="change down">Requieren reposicion</div></div>
         </div>
@@ -467,10 +486,37 @@
               <label style="font-size:13px;color:#555;display:flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap;">
                 <input type="checkbox" id="rep-agrupar" onchange="renderRepuestos()"> Agrupar
               </label>
-              <button class="btn btn-primary" onclick="document.getElementById('modal-repuesto').classList.add('show')">+ Nuevo Repuesto</button>
+              <button class="btn btn-primary" onclick="abrirModalRepuesto()">+ Nuevo Repuesto</button>
             </div>
           </div>
           <div id="repuestos-container"><div style="padding:20px;color:#888;">Cargando...</div></div>
+        </div>
+      </div>
+
+      <!-- ============ PAGE: AUDITORIA (solo admin) ============ -->
+      <div id="page-auditoria" class="page">
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Auditoria <span style="font-weight:400;color:#888;font-size:13px;">· quien hizo que y cuando</span></h3>
+            <div class="actions">
+              <select id="aud-filtro-entidad" class="search-input" style="width:auto;" onchange="loadAuditoria()">
+                <option value="">Todas las entidades</option>
+                <option value="registros">registros</option>
+                <option value="mantenimientos">mantenimientos</option>
+                <option value="tareas">tareas</option>
+                <option value="repuestos">repuestos</option>
+                <option value="maquinas">maquinas</option>
+                <option value="usuarios">usuarios</option>
+              </select>
+              <select id="aud-filtro-usuario" class="search-input" style="width:auto;" onchange="loadAuditoria()"><option value="">Todos los usuarios</option></select>
+            </div>
+          </div>
+          <table>
+            <thead><tr><th>Fecha</th><th>Usuario</th><th>Accion</th><th>Entidad</th><th>Ruta</th><th>Detalle</th></tr></thead>
+            <tbody id="auditoria-tbody">
+              <tr><td colspan="6" style="text-align:center;color:#888;padding:20px;">Cargando...</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -589,7 +635,7 @@
 <div class="modal-overlay" id="modal-repuesto">
   <div class="modal">
     <div class="modal-header">
-      <h3>Nuevo Repuesto</h3>
+      <h3 id="modal-repuesto-title">Nuevo Repuesto</h3>
       <button class="modal-close" onclick="document.getElementById('modal-repuesto').classList.remove('show')">&times;</button>
     </div>
     <div class="modal-body">
@@ -600,6 +646,10 @@
       <div class="form-group">
         <label>Descripcion</label>
         <input type="text" id="rep-descripcion" placeholder="Ej: Rodamiento 6208-2RS SKF">
+      </div>
+      <div class="form-group">
+        <label>Nº Hauni (opcional)</label>
+        <input type="text" id="rep-hauni" placeholder="Referencia del fabricante">
       </div>
       <div class="form-group">
         <label>Categoria</label>
@@ -636,7 +686,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="document.getElementById('modal-repuesto').classList.remove('show')">Cancelar</button>
-      <button class="btn btn-primary" onclick="guardarRepuesto()">Guardar</button>
+      <button class="btn btn-primary" id="btn-guardar-repuesto" onclick="guardarRepuesto()">Guardar</button>
     </div>
   </div>
 </div>
@@ -758,6 +808,23 @@
   </div>
 </div>
 
+<!-- Modal: Conjuntos de una maquina (renombrar / eliminar) -->
+<div class="modal-overlay" id="modal-conjuntos">
+  <div class="modal" style="width:620px;">
+    <div class="modal-header">
+      <h3 id="modal-conjuntos-title">Conjuntos</h3>
+      <button class="modal-close" onclick="document.getElementById('modal-conjuntos').classList.remove('show')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="text" class="search-input" id="conj-buscar" style="width:100%;margin-bottom:10px;" placeholder="Filtrar conjuntos..." oninput="renderConjuntos()">
+      <div id="conjuntos-list" style="max-height:420px;overflow-y:auto;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="document.getElementById('modal-conjuntos').classList.remove('show')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: Nuevo Mantenimiento -->
 <div class="modal-overlay" id="modal-mant">
   <div class="modal" style="width:640px;">
@@ -848,6 +915,7 @@
     </div>
     <div class="modal-body" id="detalle-body"></div>
     <div class="modal-footer">
+      <button class="btn btn-sm" id="btn-eliminar-registro" style="background:#f8d7da;color:#721c24;margin-right:auto;display:none;" onclick="eliminarRegistro()">Eliminar registro</button>
       <button class="btn btn-outline" onclick="document.getElementById('modal-detalle').classList.remove('show')">Cerrar</button>
     </div>
   </div>
@@ -930,6 +998,35 @@ async function api(path, opts = {}) {
   return res.json();
 }
 
+// Notificaciones no bloqueantes (reemplazan a los alert del prototipo)
+function toast(msg, tipo = 'error') {
+  let cont = document.getElementById('toast-cont');
+  if (!cont) { cont = document.createElement('div'); cont.id = 'toast-cont'; document.body.appendChild(cont); }
+  const t = document.createElement('div');
+  t.className = 'toast toast-' + tipo;
+  t.textContent = msg;
+  cont.appendChild(t);
+  setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 350); }, 3500);
+}
+
+// Badges vivos del sidebar (tareas vencidas / mantenimientos pendientes)
+async function refreshBadges() {
+  const s = await api('/dashboard/stats');
+  if (!s) return;
+  const bt = document.getElementById('badge-tareas');
+  bt.textContent = s.tareas_vencidas;
+  bt.style.display = s.tareas_vencidas > 0 ? '' : 'none';
+  const bm = document.getElementById('badge-mants');
+  bm.textContent = s.mantenimientos_planificados_pendientes;
+  bm.style.display = s.mantenimientos_planificados_pendientes > 0 ? '' : 'none';
+}
+
+// Navegar a una pagina marcando el link del sidebar correspondiente
+function navTo(page) {
+  const link = [...document.querySelectorAll('.sidebar a')].find(a => (a.getAttribute('onclick') || '').includes(`'${page}'`));
+  showPage(page, link || null);
+}
+
 // Login
 async function doLogin() {
   const id = document.getElementById('login-id').value.trim();
@@ -950,6 +1047,7 @@ async function doLogin() {
   document.getElementById('login-overlay').classList.remove('show');
   document.getElementById('topbar-user').textContent = currentUser.nombre;
   document.getElementById('topbar-avatar').textContent = currentUser.nombre.slice(0, 2).toUpperCase();
+  aplicarPermisosUI();
   loadDashboard();
 }
 
@@ -964,6 +1062,7 @@ if (currentUser) {
   document.getElementById('login-overlay').classList.remove('show');
   document.getElementById('topbar-user').textContent = currentUser.nombre;
   document.getElementById('topbar-avatar').textContent = currentUser.nombre.slice(0, 2).toUpperCase();
+  aplicarPermisosUI();
   loadDashboard();
 }
 
@@ -976,16 +1075,53 @@ function quickLogin(id, pin) {
 document.getElementById('login-pin').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
 // Navigation
-const pageLoaders = { dashboard: loadDashboard, equipos: loadEquipos, mantenimientos: loadMantenimientos, ordenes: loadRegistros, calendario: loadCalendario, tareas: loadTareas, repuestos: loadRepuestos, usuarios: loadUsuarios };
+const pageLoaders = { dashboard: loadDashboard, equipos: loadEquipos, mantenimientos: loadMantenimientos, ordenes: loadRegistros, calendario: loadCalendario, tareas: loadTareas, repuestos: loadRepuestos, usuarios: loadUsuarios, auditoria: loadAuditoria };
 
 function showPage(page, el) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.sidebar a').forEach(a => a.classList.remove('active'));
   document.getElementById('page-' + page).classList.add('active');
   if (el) el.classList.add('active');
-  const titles = { dashboard:'Dashboard', equipos:'Maquinas / Activos', mantenimientos:'Mantenimientos', ordenes:'Registros de Mantenimiento', calendario:'Calendario de Mantenimientos', tareas:'Tareas Preventivas', repuestos:'Inventario de Repuestos', usuarios:'Tecnicos & Usuarios' };
+  const titles = { dashboard:'Dashboard', equipos:'Maquinas / Activos', mantenimientos:'Mantenimientos', ordenes:'Registros de Mantenimiento', calendario:'Calendario de Mantenimientos', tareas:'Tareas Preventivas', repuestos:'Inventario de Repuestos', usuarios:'Tecnicos & Usuarios', auditoria:'Auditoria' };
   document.getElementById('page-title').textContent = titles[page] || 'Dashboard';
+  document.title = 'CMMS · ' + (titles[page] || 'Dashboard');
   if (pageLoaders[page]) pageLoaders[page]();
+}
+
+// La entrada Auditoria solo se muestra a administradores
+function aplicarPermisosUI() {
+  document.getElementById('nav-auditoria').style.display = currentUser?.rol === 'Administrador' ? '' : 'none';
+}
+
+async function loadAuditoria() {
+  const ent = document.getElementById('aud-filtro-entidad').value;
+  const uid = document.getElementById('aud-filtro-usuario').value;
+  const [items, usuarios] = await Promise.all([
+    api(`/auditoria?limit=300${ent ? '&entidad=' + ent : ''}${uid ? '&usuario_id=' + encodeURIComponent(uid) : ''}`),
+    api('/usuarios')
+  ]);
+  if (!items) return;
+
+  const selU = document.getElementById('aud-filtro-usuario');
+  const uActual = selU.value;
+  selU.innerHTML = '<option value="">Todos los usuarios</option>' +
+    (usuarios || []).map(u => `<option value="${u.id}" ${u.id === uActual ? 'selected' : ''}>${u.nombre}</option>`).join('');
+
+  const badges = { POST: 'badge-green', PUT: 'badge-yellow', DELETE: 'badge-red' };
+  const acciones = { POST: 'Creo', PUT: 'Modifico', DELETE: 'Elimino' };
+  const tbody = document.getElementById('auditoria-tbody');
+  if (!items.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#888;padding:20px;">Sin actividad registrada</td></tr>';
+    return;
+  }
+  tbody.innerHTML = items.map(a => `<tr>
+    <td style="white-space:nowrap;color:#888;">${a.fecha}</td>
+    <td><strong>${a.usuario_nombre}</strong></td>
+    <td><span class="badge ${badges[a.metodo] || 'badge-gray'}">${acciones[a.metodo] || a.metodo}</span></td>
+    <td>${a.entidad}</td>
+    <td style="font-size:12px;color:#888;">${a.ruta}</td>
+    <td style="max-width:340px;">${a.detalle ? `<details style="cursor:pointer;"><summary style="font-size:12px;color:#0f3460;">ver</summary><pre style="white-space:pre-wrap;word-break:break-all;font-size:11px;background:#f8f9fa;padding:6px;border-radius:6px;margin-top:4px;">${a.detalle.replace(/</g,'&lt;')}</pre></details>` : '-'}</td>
+  </tr>`).join('');
 }
 
 // Dashboard
@@ -1002,6 +1138,12 @@ async function loadDashboard() {
   document.getElementById('stat-vencidos').textContent = stats.maquinas_vencidas + ' vencidos';
   document.getElementById('stat-registros').textContent = stats.registros_este_mes;
   document.getElementById('stat-stockbajo').textContent = stats.repuestos_stock_bajo;
+  document.getElementById('stat-tareas-vencidas').textContent = stats.tareas_vencidas ?? '-';
+  document.getElementById('stat-mants-pend').textContent = stats.mantenimientos_planificados_pendientes ?? '-';
+  const bt = document.getElementById('badge-tareas');
+  bt.textContent = stats.tareas_vencidas; bt.style.display = stats.tareas_vencidas > 0 ? '' : 'none';
+  const bm = document.getElementById('badge-mants');
+  bm.textContent = stats.mantenimientos_planificados_pendientes; bm.style.display = stats.mantenimientos_planificados_pendientes > 0 ? '' : 'none';
 
   // Actividad
   const actDiv = document.getElementById('dashboard-actividad');
@@ -1056,21 +1198,76 @@ async function loadEquipos() {
       <td>
         <button class="btn btn-outline btn-sm" onclick='editarMaquina(${JSON.stringify(m).replace(/'/g,"&#39;")})'>Editar</button>
         <button class="btn btn-outline btn-sm" style="margin-left:4px;" onclick='abrirModalQR(${JSON.stringify({id:m.id,nombre:m.nombre,ubicacion:m.ubicacion}).replace(/'/g,"&#39;")})'>QR</button>
+        <button class="btn btn-outline btn-sm" style="margin-left:4px;" onclick='abrirModalConjuntos(${JSON.stringify(m.id)})'>Conjuntos</button>
         ${currentUser?.rol === 'Administrador' ? `<button class="btn btn-sm" style="margin-left:4px;background:#f8d7da;color:#721c24;" onclick="eliminarMaquina('${m.id}')">Eliminar</button>` : ''}
       </td>
     </tr>`;
   }).join('');
 }
 
+// --- Conjuntos de una maquina: renombrar / eliminar ---
+let conjMaquinaId = null, conjLista = [];
+
+async function abrirModalConjuntos(maquinaId) {
+  conjMaquinaId = maquinaId;
+  document.getElementById('conj-buscar').value = '';
+  document.getElementById('modal-conjuntos-title').textContent = 'Conjuntos de ' + maquinaId;
+  const maq = await api('/maquinas/' + encodeURIComponent(maquinaId));
+  conjLista = maq?.componentes || [];
+  renderConjuntos();
+  document.getElementById('modal-conjuntos').classList.add('show');
+}
+
+function renderConjuntos() {
+  const q = repNorm(document.getElementById('conj-buscar').value.trim());
+  const items = conjLista.filter(c => !q || repNorm(c.nombre).includes(q) || repNorm(c.seccion).includes(q));
+  const esAdmin = currentUser?.rol === 'Administrador';
+  document.getElementById('conjuntos-list').innerHTML = items.length ? items.map(c => `
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 4px;border-bottom:1px solid #f0f0f0;">
+      ${c.seccion ? `<span class="badge badge-gray" style="flex-shrink:0;">${c.seccion}</span>` : ''}
+      <span style="flex:1;font-size:13px;">${c.nombre}</span>
+      <button class="btn btn-outline btn-sm" onclick="renombrarConjunto(${c.id})">Renombrar</button>
+      ${esAdmin ? `<button class="btn btn-sm" style="background:#f8d7da;color:#721c24;" onclick="eliminarConjunto(${c.id})">Eliminar</button>` : ''}
+    </div>`).join('') : '<div style="padding:20px;color:#888;text-align:center;">Sin conjuntos</div>';
+}
+
+async function renombrarConjunto(compId) {
+  const c = conjLista.find(x => x.id === compId);
+  const nuevo = prompt('Nuevo nombre del conjunto:', c?.nombre || '');
+  if (nuevo === null || !nuevo.trim() || nuevo.trim() === c?.nombre) return;
+  const res = await api(`/maquinas/${encodeURIComponent(conjMaquinaId)}/componentes/${compId}`, {
+    method: 'PUT', body: JSON.stringify({ nombre: nuevo.trim() })
+  });
+  if (res && !res.error) {
+    toast('Conjunto renombrado', 'ok');
+    abrirModalConjuntos(conjMaquinaId);
+    loadEquipos();
+  } else { toast(res?.error || 'Error al renombrar'); }
+}
+
+async function eliminarConjunto(compId) {
+  const c = conjLista.find(x => x.id === compId);
+  if (!confirm(`¿Eliminar el conjunto "${c?.nombre}" y sus vinculos de repuestos?`)) return;
+  const res = await api(`/maquinas/${encodeURIComponent(conjMaquinaId)}/componentes/${compId}`, { method: 'DELETE' });
+  if (res && !res.error) {
+    toast('Conjunto eliminado', 'ok');
+    abrirModalConjuntos(conjMaquinaId);
+    loadEquipos();
+  } else {
+    toast(res?.error ? res.error + ' (si tiene registros en el historial no se puede borrar)' : 'Error al eliminar');
+  }
+}
+
 async function eliminarMaquina(id) {
   const escrito = prompt(`Vas a ELIMINAR la maquina ${id} con sus componentes y tareas.\nEsta accion no se puede deshacer.\n\nPara confirmar, escribi el codigo de la maquina:`);
   if (escrito === null) return;
-  if (escrito.trim() !== id) { alert('El codigo no coincide, no se elimino nada.'); return; }
+  if (escrito.trim() !== id) { toast('El codigo no coincide, no se elimino nada.'); return; }
   const res = await api('/maquinas/' + encodeURIComponent(id), { method: 'DELETE' });
   if (res && !res.error) {
+    toast('Maquina eliminada', 'ok');
     loadEquipos();
   } else {
-    alert(res?.error || 'No se pudo eliminar. Si la maquina tiene registros de mantenimiento cargados, no se puede borrar (para conservar el historial).');
+    toast(res?.error || 'No se pudo eliminar. Si la maquina tiene registros de mantenimiento cargados, no se puede borrar (para conservar el historial).');
   }
 }
 
@@ -1195,6 +1392,8 @@ const catColors = { 'Rodamientos':'#0f3460', 'Correas y Transmision':'#e94560', 
 
 let repuestosAll = [];
 let repGruposAbiertos = new Set();
+let repRenderLimit = 300;
+let repEditandoCodigo = null;
 
 // Estado de stock: sin minimo definido no es alarma, es falta de dato
 function repEstado(r) {
@@ -1212,6 +1411,7 @@ async function loadRepuestos() {
   const repuestos = await api('/repuestos');
   if (!repuestos) return;
   repuestosAll = repuestos;
+  repRenderLimit = 300;
 
   // Filtro de categorias con contador
   const cats = {};
@@ -1268,6 +1468,7 @@ function repFilaHtml(r) {
   };
   const color = catColors[r.categoria] || '#888';
   const stockStyle = est === 'sinstock' || est === 'bajo' ? 'color:#dc3545;font-weight:700;' : '';
+  const esAdmin = currentUser?.rol === 'Administrador';
   return `<tr>
     <td style="white-space:nowrap;"><strong>${r.codigo}</strong></td>
     <td>${r.descripcion}</td>
@@ -1277,10 +1478,14 @@ function repFilaHtml(r) {
     <td style="text-align:right;${stockStyle}">${r.stock_actual}</td>
     <td style="text-align:right;color:#888;">${r.stock_minimo || '-'}</td>
     <td>${badges[est]}</td>
+    <td style="white-space:nowrap;">
+      <button class="btn btn-outline btn-sm" onclick='abrirModalRepuesto(${JSON.stringify(r.codigo)})'>Editar</button>
+      ${esAdmin ? `<button class="btn btn-sm" style="margin-left:4px;background:#f8d7da;color:#721c24;" onclick='eliminarRepuesto(${JSON.stringify(r.codigo)})'>Eliminar</button>` : ''}
+    </td>
   </tr>`;
 }
 
-const REP_THEAD = '<thead><tr><th>Codigo</th><th>Descripcion</th><th>Nº Hauni</th><th>Categoria</th><th>Disciplina</th><th style="text-align:right;">Stock</th><th style="text-align:right;">Min.</th><th>Estado</th></tr></thead>';
+const REP_THEAD = '<thead><tr><th>Codigo</th><th>Descripcion</th><th>Nº Hauni</th><th>Categoria</th><th>Disciplina</th><th style="text-align:right;">Stock</th><th style="text-align:right;">Min.</th><th>Estado</th><th></th></tr></thead>';
 
 function renderRepuestos() {
   const container = document.getElementById('repuestos-container');
@@ -1299,7 +1504,13 @@ function renderRepuestos() {
   }
 
   if (!agrupar) {
-    container.innerHTML = `${conteoLine}<table>${REP_THEAD}<tbody>${items.map(repFilaHtml).join('')}</tbody></table>`;
+    // Con miles de repuestos, renderizar de a tandas para no colgar el navegador
+    const visibles = items.slice(0, repRenderLimit);
+    const restantes = items.length - visibles.length;
+    const verMas = restantes > 0
+      ? `<div style="padding:14px;text-align:center;"><button class="btn btn-outline" onclick="repRenderLimit = Infinity; renderRepuestos();">Mostrar los ${restantes} restantes</button></div>`
+      : '';
+    container.innerHTML = `${conteoLine}<table>${REP_THEAD}<tbody>${visibles.map(repFilaHtml).join('')}</tbody></table>${verMas}`;
     return;
   }
 
@@ -1366,7 +1577,21 @@ function verDetalleRegistro(id) {
     ${comps ? `<div style="font-weight:700;font-size:13px;margin:10px 0 6px;color:#0f3460;">Componentes intervenidos</div>${comps}` : ''}
     ${r.observaciones ? `<div style="margin-top:12px;padding:10px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;font-size:13px;color:#92400e;"><strong>Observacion:</strong> ${r.observaciones}</div>` : ''}
     ${!tareas && !comps && !r.observaciones ? '<div style="color:#888;font-size:13px;">Sin detalle cargado.</div>' : ''}`;
+  detalleRegistroId = r.id;
+  document.getElementById('btn-eliminar-registro').style.display = currentUser?.rol === 'Administrador' ? '' : 'none';
   document.getElementById('modal-detalle').classList.add('show');
+}
+
+let detalleRegistroId = null;
+
+async function eliminarRegistro() {
+  if (!confirm('¿Eliminar este registro del historial? Esta accion queda auditada y no se puede deshacer.')) return;
+  const res = await api('/registros/' + detalleRegistroId, { method: 'DELETE' });
+  if (res && !res.error) {
+    document.getElementById('modal-detalle').classList.remove('show');
+    toast('Registro eliminado', 'ok');
+    loadRegistros();
+  } else { toast(res?.error || 'Error al eliminar'); }
 }
 
 // =========== Mantenimientos planificados ===========
@@ -1491,8 +1716,8 @@ function mantComponentes() {
 }
 
 function mantAddItem() {
-  if (!document.getElementById('mant-maquina').value) { alert('Seleccione una maquina primero'); return; }
-  if (!mantComponentes().length) { alert('La maquina no tiene conjuntos cargados'); return; }
+  if (!document.getElementById('mant-maquina').value) { toast('Seleccione una maquina primero'); return; }
+  if (!mantComponentes().length) { toast('La maquina no tiene conjuntos cargados'); return; }
 
   const idx = mantItemCounter++;
   const div = document.createElement('div');
@@ -1509,7 +1734,7 @@ function mantAddItem() {
 }
 
 function mantToggleNuevoConj() {
-  if (!document.getElementById('mant-maquina').value) { alert('Seleccione una maquina primero'); return; }
+  if (!document.getElementById('mant-maquina').value) { toast('Seleccione una maquina primero'); return; }
   const div = document.getElementById('mant-nuevo-conj');
   const abrir = div.style.display === 'none';
   div.style.display = abrir ? '' : 'none';
@@ -1524,12 +1749,12 @@ async function mantCrearConjunto() {
   const maqId = document.getElementById('mant-maquina').value;
   const nombre = document.getElementById('mant-nc-nombre').value.trim();
   const seccion = document.getElementById('mant-nc-seccion').value.trim();
-  if (!nombre) { alert('Escriba el nombre del conjunto'); return; }
+  if (!nombre) { toast('Escriba el nombre del conjunto'); return; }
 
   const res = await api(`/maquinas/${encodeURIComponent(maqId)}/componentes`, {
     method: 'POST', body: JSON.stringify({ nombre, seccion })
   });
-  if (!res || res.error) { alert(res?.error || 'Error al crear el conjunto'); return; }
+  if (!res || res.error) { toast(res?.error || 'Error al crear el conjunto'); return; }
 
   // Actualizar cache local y buscador, sin recargar nada
   const nuevo = { id: res.id, nombre, seccion };
@@ -1556,7 +1781,7 @@ async function mantCrearConjunto() {
 async function guardarMantenimiento() {
   const maquinaId = document.getElementById('mant-maquina').value;
   const titulo = document.getElementById('mant-titulo').value.trim();
-  if (!maquinaId || !titulo) { alert('Complete maquina y titulo'); return; }
+  if (!maquinaId || !titulo) { toast('Complete maquina y titulo'); return; }
 
   // Recorrer filas: nuevas (sin item_id), existentes modificadas, y detectar eliminadas
   const nuevos = [], modificados = [], eliminar = [], vistos = new Set();
@@ -1584,13 +1809,13 @@ async function guardarMantenimiento() {
       nuevos.push({ componente_id: compId, tarea, orden: i + 1 });
     }
   });
-  if (noReconocido) { alert(`Conjunto no reconocido: "${noReconocido}". Elegilo de la lista que aparece al escribir.`); return; }
-  if (incompleto) { alert('Hay filas sin conjunto o sin tarea'); return; }
+  if (noReconocido) { toast(`Conjunto no reconocido: "${noReconocido}". Elegilo de la lista que aparece al escribir.`); return; }
+  if (incompleto) { toast('Hay filas sin conjunto o sin tarea'); return; }
 
   let res;
   if (mantEditandoId) {
     Object.keys(mantEditOriginal).map(Number).forEach(id => { if (!vistos.has(id)) eliminar.push(id); });
-    if (vistos.size + nuevos.length === 0) { alert('El mantenimiento debe tener al menos una fila'); return; }
+    if (vistos.size + nuevos.length === 0) { toast('El mantenimiento debe tener al menos una fila'); return; }
     res = await api('/mantenimientos/' + mantEditandoId, { method: 'PUT', body: JSON.stringify({
       titulo,
       horas_marcha: document.getElementById('mant-horas').value.trim() || null,
@@ -1598,7 +1823,7 @@ async function guardarMantenimiento() {
       items: modificados, nuevos_items: nuevos, eliminar_items: eliminar
     })});
   } else {
-    if (!nuevos.length) { alert('Agregue al menos una fila'); return; }
+    if (!nuevos.length) { toast('Agregue al menos una fila'); return; }
     res = await api('/mantenimientos', { method: 'POST', body: JSON.stringify({
       maquina_id: maquinaId, titulo,
       horas_marcha: document.getElementById('mant-horas').value.trim() || null,
@@ -1608,8 +1833,9 @@ async function guardarMantenimiento() {
   }
   if (res && !res.error) {
     document.getElementById('modal-mant').classList.remove('show');
+    toast(mantEditandoId ? 'Mantenimiento actualizado' : 'Mantenimiento creado', 'ok');
     loadMantenimientos();
-  } else { alert(res?.error || 'Error al guardar'); }
+  } else { toast(res?.error || 'Error al guardar'); }
 }
 
 // --- Hoja imprimible ---
@@ -1694,13 +1920,14 @@ async function guardarAvanceMant() {
   const res = await api('/mantenimientos/' + mantCompId, { method: 'PUT', body: JSON.stringify({ items: mantCompItemsPayload() }) });
   if (res && !res.error) {
     document.getElementById('modal-mant-comp').classList.remove('show');
+    toast('Avance guardado', 'ok');
     loadMantenimientos();
-  } else { alert(res?.error || 'Error al guardar'); }
+  } else { toast(res?.error || 'Error al guardar'); }
 }
 
 async function completarMant() {
   const tecnicoId = document.getElementById('mant-comp-tecnico').value;
-  if (!tecnicoId) { alert('Seleccione el responsable general'); return; }
+  if (!tecnicoId) { toast('Seleccione el responsable general'); return; }
   if (!confirm('Se va a completar el mantenimiento y generar el registro en el historial. ¿Continuar?')) return;
 
   const res = await api('/mantenimientos/' + mantCompId + '/completar', { method: 'POST', body: JSON.stringify({
@@ -1710,15 +1937,16 @@ async function completarMant() {
   })});
   if (res && !res.error) {
     document.getElementById('modal-mant-comp').classList.remove('show');
+    toast('Mantenimiento completado: quedo en el historial', 'ok');
     loadMantenimientos();
-  } else { alert(res?.error || 'Error al completar'); }
+  } else { toast(res?.error || 'Error al completar'); }
 }
 
 async function eliminarMantenimiento(id) {
   if (!confirm('¿Eliminar este mantenimiento pendiente?')) return;
   const res = await api('/mantenimientos/' + id, { method: 'DELETE' });
-  if (res && !res.error) loadMantenimientos();
-  else alert(res?.error || 'Error al eliminar');
+  if (res && !res.error) { toast('Mantenimiento eliminado', 'ok'); loadMantenimientos(); }
+  else toast(res?.error || 'Error al eliminar');
 }
 
 // =========== Tareas Preventivas ===========
@@ -1813,7 +2041,7 @@ function abrirModalTarea(id) {
 
 async function guardarTarea() {
   const nombre = document.getElementById('ta-nombre').value.trim();
-  if (!nombre) { alert('Complete el nombre de la tarea'); return; }
+  if (!nombre) { toast('Complete el nombre de la tarea'); return; }
   const tiempo = parseInt(document.getElementById('ta-tiempo').value);
   const data = {
     nombre,
@@ -1829,20 +2057,21 @@ async function guardarTarea() {
     res = await api('/tareas/' + tareaEditandoId, { method: 'PUT', body: JSON.stringify(data) });
   } else {
     data.maquina_id = document.getElementById('ta-maquina').value;
-    if (!data.maquina_id) { alert('Seleccione una maquina'); return; }
+    if (!data.maquina_id) { toast('Seleccione una maquina'); return; }
     res = await api('/tareas', { method: 'POST', body: JSON.stringify(data) });
   }
 
   if (res && !res.error) {
     document.getElementById('modal-tarea').classList.remove('show');
+    toast('Tarea guardada', 'ok');
     loadTareas();
-  } else { alert(res?.error || 'Error al guardar'); }
+  } else { toast(res?.error || 'Error al guardar'); }
 }
 
 async function tareaToggleActiva(id, activa) {
   const res = await api('/tareas/' + id, { method: 'PUT', body: JSON.stringify({ activa: !activa }) });
   if (res && !res.error) loadTareas();
-  else alert(res?.error || 'Error al actualizar');
+  else toast(res?.error || 'Error al actualizar');
 }
 
 // Usuarios
@@ -1910,7 +2139,7 @@ async function guardarUsuario() {
   const rol = document.getElementById('us-rol').value.trim();
   const acceso = document.getElementById('us-acceso').checked;
   const pin = document.getElementById('us-pin').value.trim();
-  if (!nombre || !dni || !rol) { alert('Complete nombre, DNI y rol'); return; }
+  if (!nombre || !dni || !rol) { toast('Complete nombre, DNI y rol'); return; }
 
   let res;
   if (usuarioEditandoId) {
@@ -1922,11 +2151,11 @@ async function guardarUsuario() {
     if (pin) data.pin = pin; // vacio = no cambiar
     const estado = document.getElementById('us-estado').value;
     if (estado !== u.estado) data.estado = estado;
-    if (acceso && !u.puede_ingresar && !pin) { alert('Para darle acceso necesita un PIN'); return; }
+    if (acceso && !u.puede_ingresar && !pin) { toast('Para darle acceso necesita un PIN'); return; }
     if (!Object.keys(data).length) { document.getElementById('modal-usuario').classList.remove('show'); return; }
     res = await api('/usuarios/' + encodeURIComponent(usuarioEditandoId), { method: 'PUT', body: JSON.stringify(data) });
   } else {
-    if (acceso && !pin) { alert('Un usuario con acceso necesita PIN'); return; }
+    if (acceso && !pin) { toast('Un usuario con acceso necesita PIN'); return; }
     res = await api('/usuarios', { method: 'POST', body: JSON.stringify({
       id: dni, nombre, rol, pin: acceso ? pin : '', puede_ingresar: acceso
     })});
@@ -1934,8 +2163,9 @@ async function guardarUsuario() {
 
   if (res && !res.error) {
     document.getElementById('modal-usuario').classList.remove('show');
+    toast('Usuario guardado', 'ok');
     loadUsuarios();
-  } else { alert(res?.error || 'Error al guardar usuario'); }
+  } else { toast(res?.error || 'Error al guardar usuario'); }
 }
 
 // Maquinas: crear / editar
@@ -1977,7 +2207,7 @@ async function guardarMaquina() {
   const ubicacion = document.getElementById('eq-ubicacion').value.trim();
   const frecuencia = document.getElementById('eq-frecuencia').value;
 
-  if (!nombre || !ubicacion) { alert('Complete los campos obligatorios'); return; }
+  if (!nombre || !ubicacion) { toast('Complete los campos obligatorios'); return; }
 
   if (editandoMaquinaId) {
     // Editar existente
@@ -1986,37 +2216,75 @@ async function guardarMaquina() {
     if (res && !res.error) {
       cerrarModalEquipo();
       loadEquipos();
-    } else { alert(res?.error || 'Error al actualizar'); }
+    } else { toast(res?.error || 'Error al actualizar'); }
   } else {
     // Crear nueva
     const id = document.getElementById('eq-id').value.trim();
-    if (!id) { alert('Complete el Codigo / ID'); return; }
+    if (!id) { toast('Complete el Codigo / ID'); return; }
     const data = { id, nombre, ubicacion, frecuencia_mantenimiento: frecuencia, componentes: comps };
     const res = await api('/maquinas', { method: 'POST', body: JSON.stringify(data) });
     if (res && !res.error) {
       cerrarModalEquipo();
       loadEquipos();
-    } else { alert(res?.error || 'Error al crear'); }
+    } else { toast(res?.error || 'Error al crear'); }
   }
 }
 
-// Create repuesto
+// Crear / editar repuesto (mismo modal; codigo presente = edicion)
+function abrirModalRepuesto(codigo) {
+  repEditandoCodigo = codigo || null;
+  const r = codigo ? repuestosAll.find(x => x.codigo === codigo) : null;
+  document.getElementById('modal-repuesto-title').textContent = r ? 'Editar Repuesto' : 'Nuevo Repuesto';
+  document.getElementById('btn-guardar-repuesto').textContent = r ? 'Guardar cambios' : 'Guardar';
+  const cod = document.getElementById('rep-codigo');
+  cod.value = r?.codigo || '';
+  cod.readOnly = !!r;
+  cod.style.background = r ? '#f1f5f9' : '';
+  document.getElementById('rep-descripcion').value = r?.descripcion || '';
+  document.getElementById('rep-hauni').value = r?.nro_hauni || '';
+  document.getElementById('rep-categoria').value = r?.categoria || 'Rodamientos';
+  document.getElementById('rep-disciplina').value = r?.disciplina || 'Mecanico';
+  document.getElementById('rep-stock').value = r?.stock_actual ?? 0;
+  document.getElementById('rep-minimo').value = r?.stock_minimo ?? 3;
+  document.getElementById('modal-repuesto').classList.add('show');
+}
+
 async function guardarRepuesto() {
   const data = {
-    codigo: document.getElementById('rep-codigo').value.trim(),
     descripcion: document.getElementById('rep-descripcion').value.trim(),
+    nro_hauni: document.getElementById('rep-hauni').value.trim() || null,
     categoria: document.getElementById('rep-categoria').value,
     disciplina: document.getElementById('rep-disciplina').value,
     stock_actual: parseInt(document.getElementById('rep-stock').value) || 0,
     stock_minimo: parseInt(document.getElementById('rep-minimo').value) || 0
   };
-  if (!data.codigo || !data.descripcion) { alert('Complete los campos obligatorios'); return; }
-  const res = await api('/repuestos', { method: 'POST', body: JSON.stringify(data) });
+  const codigo = document.getElementById('rep-codigo').value.trim();
+  if (!codigo || !data.descripcion) { toast('Complete los campos obligatorios'); return; }
+
+  let res;
+  if (repEditandoCodigo) {
+    res = await api('/repuestos/' + encodeURIComponent(repEditandoCodigo), { method: 'PUT', body: JSON.stringify(data) });
+  } else {
+    res = await api('/repuestos', { method: 'POST', body: JSON.stringify({ ...data, codigo }) });
+  }
   if (res && !res.error) {
     document.getElementById('modal-repuesto').classList.remove('show');
-    ['rep-codigo','rep-descripcion'].forEach(id => document.getElementById(id).value = '');
+    toast(repEditandoCodigo ? 'Repuesto actualizado' : 'Repuesto creado', 'ok');
     loadRepuestos();
-  } else { alert(res?.error || 'Error al crear'); }
+  } else { toast(res?.error || 'Error al guardar'); }
+}
+
+async function eliminarRepuesto(codigo) {
+  if (!confirm(`¿Eliminar el repuesto ${codigo} del inventario?`)) return;
+  const res = await api('/repuestos/' + encodeURIComponent(codigo), { method: 'DELETE' });
+  if (res && !res.error) {
+    toast('Repuesto eliminado', 'ok');
+    loadRepuestos();
+  } else {
+    toast(res?.error === 'Error al eliminar'
+      ? 'No se puede eliminar: esta vinculado a conjuntos o registros (conserva el historial)'
+      : (res?.error || 'Error al eliminar'));
+  }
 }
 
 // =========== Registro de Mantenimiento ===========
@@ -2069,9 +2337,9 @@ async function crearPersonaInline() {
   const nombre = document.getElementById('np-nombre').value.trim();
   const dni = document.getElementById('np-dni').value.trim();
   const rol = document.getElementById('np-rol').value.trim();
-  if (!nombre || !dni || !rol) { alert('Complete nombre, DNI y rol'); return; }
+  if (!nombre || !dni || !rol) { toast('Complete nombre, DNI y rol'); return; }
   const res = await api('/usuarios', { method: 'POST', body: JSON.stringify({ id: dni, nombre, rol, puede_ingresar: false }) });
-  if (!res || res.error) { alert(res?.error || 'Error al crear persona'); return; }
+  if (!res || res.error) { toast(res?.error || 'Error al crear persona'); return; }
   const usuarios = await api('/usuarios');
   poblarTecnicos(usuarios || [], dni);
   document.getElementById('reg-nueva-persona').style.display = 'none';
@@ -2137,8 +2405,8 @@ function getSeccionesMaquinaActual() {
 
 function addRegistroComponente() {
   const comps = getComponentesMaquinaActual();
-  if (!document.getElementById('reg-maquina').value) { alert('Seleccione una maquina primero'); return; }
-  if (!comps.length) { alert('La maquina no tiene componentes cargados'); return; }
+  if (!document.getElementById('reg-maquina').value) { toast('Seleccione una maquina primero'); return; }
+  if (!comps.length) { toast('La maquina no tiene componentes cargados'); return; }
 
   const secciones = getSeccionesMaquinaActual();
   const idx = regCompCounter++;
@@ -2195,11 +2463,11 @@ function cargarConjuntosSeccion(idx) {
 
 async function crearConjuntoInline(idx) {
   const nombre = document.getElementById(`nc-nombre-${idx}`).value.trim();
-  if (!nombre) { alert('Escriba el nombre del conjunto'); return; }
+  if (!nombre) { toast('Escriba el nombre del conjunto'); return; }
   const maqId = document.getElementById('reg-maquina').value;
   const seccion = document.getElementById(`reg-comp-secc-${idx}`)?.value || '';
   const res = await api(`/maquinas/${maqId}/componentes`, { method: 'POST', body: JSON.stringify({ nombre, seccion }) });
-  if (!res || res.error) { alert(res?.error || 'Error al crear conjunto'); return; }
+  if (!res || res.error) { toast(res?.error || 'Error al crear conjunto'); return; }
   // refrescar componentes de la maquina y seleccionar el nuevo
   const maq = await api('/maquinas/' + maqId);
   const i = regMaquinas.findIndex(m => m.id === maqId);
@@ -2242,7 +2510,7 @@ function opcionesRepuesto(reps, seleccionar) {
 let repCounters = {};
 function addRegistroRepuesto(compIdx) {
   const compId = document.getElementById(`reg-comp-sel-${compIdx}`).value;
-  if (!compId || compId === '__nuevo') { alert('Seleccione el conjunto primero'); return; }
+  if (!compId || compId === '__nuevo') { toast('Seleccione el conjunto primero'); return; }
   const reps = repuestosDeConjunto(compId);
   if (!repCounters[compIdx]) repCounters[compIdx] = 0;
   const repIdx = repCounters[compIdx]++;
@@ -2295,14 +2563,14 @@ async function crearRepuestoInline(compIdx, repIdx) {
   const desc = row.querySelector('.nr-desc').value.trim();
   const codigo = row.querySelector('.nr-codigo').value.trim();
   const hauni = row.querySelector('.nr-hauni').value.trim();
-  if (!desc || !codigo) { alert('Complete descripcion y Nº de pieza'); return; }
+  if (!desc || !codigo) { toast('Complete descripcion y Nº de pieza'); return; }
   const compId = document.getElementById(`reg-comp-sel-${compIdx}`).value;
   const maqId = document.getElementById('reg-maquina').value;
   const res = await api(`/maquinas/${maqId}/componentes/${compId}/repuestos`, {
     method: 'POST',
     body: JSON.stringify({ codigo, descripcion: desc, nro_hauni: hauni || null })
   });
-  if (!res || res.error) { alert(res?.error || 'Error al crear repuesto'); return; }
+  if (!res || res.error) { toast(res?.error || 'Error al crear repuesto'); return; }
   // refrescar cache del conjunto y dejar seleccionado el nuevo
   const reps = await api(`/maquinas/${maqId}/componentes/${compId}/repuestos`);
   repuestosConjuntoCache[compId] = reps || [];
@@ -2317,8 +2585,8 @@ async function guardarRegistro() {
   const tecnicoId = document.getElementById('reg-tecnico').value;
   const observaciones = document.getElementById('reg-observaciones').value.trim();
 
-  if (!maquinaId) { alert('Seleccione una maquina'); return; }
-  if (!tecnicoId || tecnicoId === '__nueva') { alert('Seleccione un tecnico'); return; }
+  if (!maquinaId) { toast('Seleccione una maquina'); return; }
+  if (!tecnicoId || tecnicoId === '__nueva') { toast('Seleccione un tecnico'); return; }
 
   // Recolectar conjuntos y repuestos
   const componentes = [];
@@ -2351,8 +2619,8 @@ async function guardarRegistro() {
     });
   }
 
-  if (sinConjunto) { alert('Hay partes sin conjunto seleccionado'); return; }
-  if (!componentes.length && !tareas.length) { alert('Agregue una parte intervenida o complete el checklist'); return; }
+  if (sinConjunto) { toast('Hay partes sin conjunto seleccionado'); return; }
+  if (!componentes.length && !tareas.length) { toast('Agregue una parte intervenida o complete el checklist'); return; }
 
   const now = new Date();
   const fecha = now.toISOString().slice(0, 10) + ' ' + now.toTimeString().slice(0, 5);
@@ -2371,9 +2639,10 @@ async function guardarRegistro() {
   const res = await api('/registros', { method: 'POST', body: JSON.stringify(data) });
   if (res && !res.error) {
     cerrarModalRegistro();
+    toast('Registro guardado', 'ok');
     repCounters = {};
     loadRegistros();
-  } else { alert(res?.error || 'Error al crear registro'); }
+  } else { toast(res?.error || 'Error al crear registro'); }
 }
 
 // =========== QR Code ===========

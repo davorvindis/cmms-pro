@@ -281,6 +281,53 @@ func (h *MaquinaHandler) AddComponenteRepuesto(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"codigo": req.Codigo, "message": "Repuesto vinculado al conjunto"})
 }
 
+// UpdateComponente renombra o cambia de seccion un conjunto.
+func (h *MaquinaHandler) UpdateComponente(c *gin.Context) {
+	maquinaID := c.Param("id")
+	compID := c.Param("compId")
+	var req struct {
+		Nombre  *string `json:"nombre"`
+		Seccion *string `json:"seccion"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos invalidos"})
+		return
+	}
+
+	sets := []string{}
+	args := []interface{}{}
+	argIdx := 1
+	if req.Nombre != nil && *req.Nombre != "" {
+		sets = append(sets, "nombre = "+h.D.Param(argIdx))
+		args = append(args, *req.Nombre)
+		argIdx++
+	}
+	if req.Seccion != nil {
+		sets = append(sets, "seccion = "+h.D.Param(argIdx))
+		args = append(args, *req.Seccion)
+		argIdx++
+	}
+	if len(sets) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Nada que actualizar"})
+		return
+	}
+
+	query := fmt.Sprintf("UPDATE Componentes SET %s WHERE id = %s AND maquina_id = %s",
+		strings.Join(sets, ", "), h.D.Param(argIdx), h.D.Param(argIdx+1))
+	args = append(args, compID, maquinaID)
+
+	result, err := h.DB.Exec(query, args...)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar conjunto"})
+		return
+	}
+	if n, _ := result.RowsAffected(); n == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Conjunto no encontrado"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Conjunto actualizado"})
+}
+
 func (h *MaquinaHandler) DeleteComponente(c *gin.Context) {
 	compID := c.Param("compId")
 	result, err := h.DB.Exec("DELETE FROM Componentes WHERE id = "+h.D.Param(1), compID)

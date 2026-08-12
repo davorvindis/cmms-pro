@@ -275,15 +275,12 @@ test.describe('Modal: Nueva Maquina', () => {
     await expect(page.locator('#modal-equipo')).not.toHaveClass(/show/);
   });
 
-  test('saving with empty fields shows native alert', async ({ page }) => {
+  test('saving with empty fields shows toast de error', async ({ page }) => {
     await openBackoffice(page);
     await page.click('text=Maquinas / Activos');
     await page.click('button:has-text("+ Nueva Maquina")');
-
-    let alertText = '';
-    page.once('dialog', async (dialog) => { alertText = dialog.message(); await dialog.accept(); });
     await page.click('button:has-text("Guardar y generar QR")');
-    expect(alertText).toBe('Complete los campos obligatorios');
+    await expect(page.locator('.toast-error')).toContainText('Complete los campos obligatorios');
   });
 
   test('saving with valid data closes modal and reloads table', async ({ page }) => {
@@ -405,15 +402,12 @@ test.describe('Repuestos page', () => {
     await expect(page.locator('#modal-repuesto')).toHaveClass(/show/);
   });
 
-  test('saving repuesto with empty fields shows alert', async ({ page }) => {
+  test('saving repuesto with empty fields shows toast de error', async ({ page }) => {
     await openBackoffice(page);
     await page.click('text=Repuestos');
     await page.click('button:has-text("+ Nuevo Repuesto")');
-
-    let alertText = '';
-    page.once('dialog', async (dialog) => { alertText = dialog.message(); await dialog.accept(); });
     await page.click('#modal-repuesto button:has-text("Guardar")');
-    expect(alertText).toBe('Complete los campos obligatorios');
+    await expect(page.locator('.toast-error')).toContainText('Complete los campos obligatorios');
   });
 
   test('saving repuesto with valid data closes modal', async ({ page }) => {
@@ -620,14 +614,9 @@ test.describe('Eliminar maquina', () => {
   test('codigo mal escrito no elimina y avisa', async ({ page }) => {
     await openBackoffice(page);
     await page.click('text=Maquinas / Activos');
-    const dialogs = [];
-    page.on('dialog', async (d) => {
-      dialogs.push(d.type());
-      if (d.type() === 'prompt') await d.accept('OTRA-COSA');
-      else await d.accept();
-    });
+    page.on('dialog', async (d) => { if (d.type() === 'prompt') await d.accept('OTRA-COSA'); else await d.accept(); });
     await page.locator('#equipos-tbody button:has-text("Eliminar")').first().click();
-    await expect.poll(() => dialogs).toContain('alert');
+    await expect(page.locator('.toast-error')).toContainText('no coincide');
   });
 
   test('confirmando con el codigo exacto manda DELETE', async ({ page }) => {
@@ -813,10 +802,8 @@ test.describe('Mantenimientos — buscador de conjuntos', () => {
     await page.fill('#mant-titulo', 'Prueba');
     await page.fill('#mant-items-list input[id^="mant-item-comp-"]', 'NoExiste');
     await page.fill('#mant-items-list input[id^="mant-item-tarea-"]', 'limpieza');
-    let alertText = '';
-    page.once('dialog', async (d) => { alertText = d.message(); await d.accept(); });
     await page.click('#modal-mant button:has-text("Crear Mantenimiento")');
-    expect(alertText).toContain('Conjunto no reconocido');
+    await expect(page.locator('.toast-error')).toContainText('Conjunto no reconocido');
   });
 
   test('el datalist de conjuntos se llena con los de la maquina', async ({ page }) => {
@@ -888,5 +875,109 @@ test.describe('Mantenimientos — editar', () => {
     expect(payload.items).toEqual([{ item_id: 11, tarea: 'lubricacion' }]);
     expect(payload.eliminar_items).toEqual([12]);
     expect(payload.nuevos_items).toEqual([{ componente_id: 2, tarea: 'limpieza', orden: 2 }]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 16. CMMS 2.0 — auditoria, edicion de repuestos/conjuntos, toasts, badges
+// ---------------------------------------------------------------------------
+
+test.describe('Auditoria', () => {
+  test('admin ve el link y la pagina lista la actividad', async ({ page }) => {
+    await openBackoffice(page);
+    await expect(page.locator('#nav-auditoria')).toBeVisible();
+    await page.click('#nav-auditoria');
+    await expect(page.locator('#page-auditoria')).toHaveClass(/active/);
+    await expect(page.locator('#auditoria-tbody tr')).toHaveCount(FIXTURES.auditoria.length);
+    await expect(page.locator('#auditoria-tbody')).toContainText('Maciel Entry');
+    await expect(page.locator('#auditoria-tbody .badge-yellow')).toHaveText('Modifico');
+  });
+
+  test('usuario no admin no ve el link de auditoria', async ({ page }) => {
+    await mockApi(page);
+    await seedSession(page, 'dataEntry');
+    await page.goto('/backoffice.html');
+    await expect(page.locator('#login-overlay')).not.toHaveClass(/show/);
+    await expect(page.locator('#nav-auditoria')).toBeHidden();
+  });
+});
+
+test.describe('Repuestos 2.0', () => {
+  test('editar precarga y manda PUT', async ({ page }) => {
+    await openBackoffice(page);
+    await page.click('text=Repuestos');
+    await page.locator('#repuestos-container tr:has-text("ROD-001") button:has-text("Editar")').click();
+    await expect(page.locator('#modal-repuesto-title')).toHaveText('Editar Repuesto');
+    await expect(page.locator('#rep-codigo')).toHaveValue('ROD-001');
+    await page.fill('#rep-stock', '9');
+
+    const requestPromise = page.waitForRequest(
+      (req) => req.url().endsWith('/api/repuestos/ROD-001') && req.method() === 'PUT'
+    );
+    await page.click('#btn-guardar-repuesto');
+    const req = await requestPromise;
+    expect(JSON.parse(req.postData() || '{}').stock_actual).toBe(9);
+    await expect(page.locator('.toast-ok')).toContainText('Repuesto actualizado');
+  });
+
+  test('eliminar repuesto manda DELETE (admin)', async ({ page }) => {
+    await openBackoffice(page);
+    await page.click('text=Repuestos');
+    page.on('dialog', (d) => d.accept());
+    const requestPromise = page.waitForRequest(
+      (req) => req.url().endsWith('/api/repuestos/ROD-002') && req.method() === 'DELETE'
+    );
+    await page.locator('#repuestos-container tr:has-text("ROD-002") button:has-text("Eliminar")').click();
+    await requestPromise;
+  });
+});
+
+test.describe('Conjuntos por maquina', () => {
+  test('renombrar conjunto manda PUT', async ({ page }) => {
+    await openBackoffice(page);
+    await page.click('text=Maquinas / Activos');
+    await page.locator('#equipos-tbody tr').first().locator('button:has-text("Conjuntos")').click();
+    await expect(page.locator('#modal-conjuntos')).toHaveClass(/show/);
+    await expect(page.locator('#conjuntos-list button:has-text("Renombrar")')).toHaveCount(FIXTURES.maquinas[0].componentes.length);
+
+    page.on('dialog', (d) => d.accept('Turbina renombrada'));
+    const requestPromise = page.waitForRequest(
+      (req) => /\/api\/maquinas\/MAQ-001\/componentes\/1$/.test(req.url()) && req.method() === 'PUT'
+    );
+    await page.locator('#conjuntos-list button:has-text("Renombrar")').first().click();
+    const req = await requestPromise;
+    expect(JSON.parse(req.postData() || '{}')).toEqual({ nombre: 'Turbina renombrada' });
+  });
+});
+
+test.describe('Dashboard y badges 2.0', () => {
+  test('tiles nuevos y badges del sidebar muestran los contadores', async ({ page }) => {
+    await openBackoffice(page);
+    await expect(page.locator('#stat-tareas-vencidas')).toHaveText('3');
+    await expect(page.locator('#stat-mants-pend')).toHaveText('1');
+    await expect(page.locator('#badge-tareas')).toHaveText('3');
+    await expect(page.locator('#badge-mants')).toHaveText('1');
+  });
+
+  test('click en el tile de tareas vencidas navega a la pagina', async ({ page }) => {
+    await openBackoffice(page);
+    await page.click('#stat-tareas-vencidas');
+    await expect(page.locator('#page-tareas')).toHaveClass(/active/);
+  });
+});
+
+test.describe('Eliminar registro desde detalle', () => {
+  test('admin elimina y manda DELETE', async ({ page }) => {
+    await openBackoffice(page);
+    await page.click('text=Registros de Mant.');
+    await page.click('#registros-tbody button:has-text("Detalle")');
+    await expect(page.locator('#btn-eliminar-registro')).toBeVisible();
+    page.on('dialog', (d) => d.accept());
+    const requestPromise = page.waitForRequest(
+      (req) => /\/api\/registros\/101$/.test(req.url()) && req.method() === 'DELETE'
+    );
+    await page.click('#btn-eliminar-registro');
+    await requestPromise;
+    await expect(page.locator('.toast-ok')).toContainText('Registro eliminado');
   });
 });

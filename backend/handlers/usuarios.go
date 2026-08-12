@@ -8,6 +8,7 @@ import (
 
 	"cmms-backend/db"
 	"cmms-backend/models"
+	"cmms-backend/security"
 
 	"github.com/gin-gonic/gin"
 )
@@ -24,14 +25,29 @@ func (h *UsuarioHandler) Login(c *gin.Context) {
 		return
 	}
 
-	query := "SELECT id, nombre, rol, puede_ingresar, estado FROM Usuarios WHERE id = " + h.D.Param(1) +
-		" AND pin = " + h.D.Param(2) + " AND pin <> '' AND puede_ingresar = 1 AND estado = 'Activo'"
+	rlKey := req.ID + "|" + c.ClientIP()
+	if !security.LoginAllowed(rlKey) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "Demasiados intentos, espere un minuto"})
+		return
+	}
+
+	query := "SELECT id, nombre, rol, pin, puede_ingresar, estado FROM Usuarios WHERE id = " + h.D.Param(1) +
+		" AND pin <> '' AND puede_ingresar = 1 AND estado = 'Activo'"
 
 	var user models.Usuario
-	err := h.DB.QueryRow(query, req.ID, req.Pin).Scan(&user.ID, &user.Nombre, &user.Rol, &user.PuedeIngresar, &user.Estado)
-	if err != nil {
+	var stored string
+	err := h.DB.QueryRow(query, req.ID).Scan(&user.ID, &user.Nombre, &user.Rol, &stored, &user.PuedeIngresar, &user.Estado)
+	if err != nil || !security.CheckPin(stored, req.Pin) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Credenciales invalidas"})
 		return
+	}
+	security.LoginSucceeded(rlKey)
+
+	// PIN legado en texto plano: se migra a hash en el primer login exitoso
+	if !security.IsHashed(stored) {
+		if hash := security.HashPin(req.Pin); hash != "" {
+			h.DB.Exec(fmt.Sprintf("UPDATE Usuarios SET pin = %s WHERE id = %s", h.D.Param(1), h.D.Param(2)), hash, user.ID)
+		}
 	}
 
 	c.JSON(http.StatusOK, user)
@@ -96,6 +112,9 @@ func (h *UsuarioHandler) Create(c *gin.Context) {
 	if req.PuedeIngresar {
 		puede = 1
 	}
+	if req.Pin != "" {
+		req.Pin = security.HashPin(req.Pin)
+	}
 	query := fmt.Sprintf("INSERT INTO Usuarios (id, nombre, rol, pin, puede_ingresar) VALUES (%s, %s, %s, %s, %s)",
 		h.D.Param(1), h.D.Param(2), h.D.Param(3), h.D.Param(4), h.D.Param(5))
 
@@ -132,7 +151,11 @@ func (h *UsuarioHandler) Update(c *gin.Context) {
 	}
 	if req.Pin != nil {
 		sets = append(sets, "pin = "+h.D.Param(argIdx))
-		args = append(args, *req.Pin)
+		hash := ""
+		if *req.Pin != "" {
+			hash = security.HashPin(*req.Pin)
+		}
+		args = append(args, hash)
 		argIdx++
 	}
 	if req.PuedeIngresar != nil {

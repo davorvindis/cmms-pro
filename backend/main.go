@@ -11,6 +11,7 @@ import (
 	"cmms-backend/db/seed"
 	"cmms-backend/handlers"
 	"cmms-backend/middleware"
+	"cmms-backend/security"
 
 	"github.com/gin-gonic/gin"
 )
@@ -45,6 +46,9 @@ func main() {
 		seed.Run(database)
 	}
 
+	// PINs legados en texto plano -> hash bcrypt
+	security.BackfillPins(database, dialect.Param)
+
 	r := gin.Default()
 	r.Use(middleware.CORS(cfg.CORSOrigin))
 
@@ -61,6 +65,7 @@ func main() {
 	dashboardH := &handlers.DashboardHandler{DB: database, D: dialect}
 	tareaH := &handlers.TareaHandler{DB: database, D: dialect}
 	mantH := &handlers.MantenimientoHandler{DB: database, D: dialect}
+	auditH := &handlers.AuditoriaHandler{DB: database, D: dialect}
 
 	// Health check (liveness + readiness con ping a DB)
 	r.GET("/health", func(c *gin.Context) {
@@ -83,13 +88,18 @@ func main() {
 	// Protected routes
 	api := r.Group("/api")
 	api.Use(middleware.AuthRequired(database, dialect))
+	api.Use(middleware.Audit(database, dialect))
 	{
+		// Auditoria (solo admin)
+		api.GET("/auditoria", middleware.RequireRole("Administrador"), auditH.List)
+
 		// Maquinas
 		api.GET("/maquinas", maquinaH.List)
 		api.POST("/maquinas", maquinaH.Create)
 		api.PUT("/maquinas/:id", maquinaH.Update)
 		api.DELETE("/maquinas/:id", middleware.RequireRole("Administrador"), maquinaH.Delete)
 		api.POST("/maquinas/:id/componentes", maquinaH.AddComponente)
+		api.PUT("/maquinas/:id/componentes/:compId", maquinaH.UpdateComponente)
 		api.DELETE("/maquinas/:id/componentes/:compId", maquinaH.DeleteComponente)
 		api.GET("/maquinas/:id/componentes/:compId/repuestos", maquinaH.ListRepuestos)
 		api.POST("/maquinas/:id/componentes/:compId/repuestos", maquinaH.AddComponenteRepuesto)

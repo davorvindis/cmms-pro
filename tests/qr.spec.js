@@ -597,7 +597,7 @@ test.describe('Checklist preventivo', () => {
     const requestPromise = page.waitForRequest(
       (req) => req.url().endsWith('/api/registros') && req.method() === 'POST'
     );
-    await page.click('.btn-guardar');
+    await page.click('#form-registro .btn-guardar');
     const req = await requestPromise;
     const payload = JSON.parse(req.postData() || '{}');
     expect(payload.componentes).toEqual([]);
@@ -609,10 +609,8 @@ test.describe('Checklist preventivo', () => {
   test('submit with nothing selected shows combined alert', async ({ page }) => {
     await openFormRegistro(page);
     await page.selectOption('#qr-reg-tecnico', 'tec01');
-    let alertText = '';
-    page.once('dialog', async (dialog) => { alertText = dialog.message(); await dialog.accept(); });
-    await page.click('.btn-guardar');
-    expect(alertText).toBe('Agregue una parte intervenida o complete el checklist');
+    await page.click('#form-registro .btn-guardar');
+    await expect(page.locator('.toast-error')).toContainText('Agregue una parte intervenida o complete el checklist');
   });
 
   test('historial shows tareas of a registro', async ({ page }) => {
