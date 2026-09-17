@@ -1,5 +1,37 @@
 # TODO CMMS
 
+## EN CURSO — Absorber app Electrónica (sesión 2026-09-17)
+Decisión: opción híbrida. Todos ven todo, UI seccionada por disciplina, filtro inicial = disciplina del usuario.
+Vocabulario DB: `Mecanico` | `Electrico` (el que ya usa Repuestos). Usuarios además `Ambas`.
+
+### Backend (fork)
+- [x] ensureColumn: Usuarios.disciplina (Ambas para Administrador existente), Tareas/Mantenimientos/Registros.disciplina, Maquinas.plc/hmi/hmi_estado/doc_url
+- [x] Models + handlers: disciplina en JSON de usuario/tarea/mantenimiento/registro; `?disciplina=` en listados; campos electrónica en máquinas
+- [x] Dashboard stats/alertas con `?disciplina=`
+- [x] Servir /manifest.webmanifest, /sw.js, /icons/* desde static
+- [x] `go build` + `go vet` OK, smoke local sqlite
+
+### Frontend (yo)
+- [x] Selector de disciplina en topbar (persistido), filtra tareas/mants/registros/repuestos/dashboard
+- [x] Usuarios: campo disciplina en alta/edición y en tabla
+- [x] Máquinas: campos PLC/HMI/estado HMI/URL doc en modal y ficha
+- [x] Tareas y Mantenimientos: disciplina en alta + badge
+- [x] Registros: disciplina al crear (backoffice y qr.html)
+- [x] qr.html: checklist filtrado por disciplina, selector si usuario es Ambas
+- [x] PWA: manifest, sw.js (cache-first estáticos, network-first API), íconos, meta theme-color/apple
+- [x] Layout mobile: sidebar → drawer con hamburguesa, tablas scroll horizontal, stats 2 col
+- [x] Copiar HTML a backend/static, playwright verde (132), tests nuevos de consistencia
+
+### Cierre
+- [x] Bitácora + CLAUDE.md + registro-apps (decisión: Supabase de Gastón se apaga cuando electrónica migre)
+- [ ] Deploy v15 + smoke
+
+### Fase 2 (no ahora, vienen de la app de Gastón)
+- [ ] Minutas (pedidos urgentes de Producción a electrónica)
+- [ ] 2 responsables + nota de continuidad entre turnos en órdenes
+- [ ] Sugerencias de mejora
+- [ ] Importar máquinas/plantillas que Gastón ya cargó en Supabase (pedirle export)
+
 ## Pendiente Davor (operativo)
 - [ ] Cambiar PIN de admin (sigue 1234) — urgente, 2 min
 - [ ] Piloto real: Maciel/Gonzalo cargan un preventivo escaneando QR

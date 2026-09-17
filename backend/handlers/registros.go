@@ -20,7 +20,7 @@ type RegistroHandler struct {
 
 func (h *RegistroHandler) listQuery() string {
 	return fmt.Sprintf(`SELECT r.id, r.maquina_id, m.nombre,
-		%s, r.tipo, r.tecnico_id, t.nombre, r.registrado_por_id, rp.nombre,
+		%s, r.tipo, r.disciplina, r.tecnico_id, t.nombre, r.registrado_por_id, rp.nombre,
 		%s, r.observaciones
 		FROM Registros r
 		JOIN Maquinas m ON r.maquina_id = m.id
@@ -33,7 +33,7 @@ func (h *RegistroHandler) listQuery() string {
 func (h *RegistroHandler) scanRegistro(rows *sql.Rows) (models.Registro, error) {
 	var r models.Registro
 	err := rows.Scan(&r.ID, &r.MaquinaID, &r.MaquinaNombre, &r.Fecha,
-		&r.Tipo, &r.TecnicoID, &r.TecnicoNombre, &r.RegistradoPorID, &r.RegistradoPorNombre,
+		&r.Tipo, &r.Disciplina, &r.TecnicoID, &r.TecnicoNombre, &r.RegistradoPorID, &r.RegistradoPorNombre,
 		&r.ProximoMantenimiento, &r.Observaciones)
 	return r, err
 }
@@ -51,6 +51,11 @@ func (h *RegistroHandler) List(c *gin.Context) {
 	if tipo := c.Query("tipo"); tipo != "" {
 		query += " AND r.tipo = " + h.D.Param(argIdx)
 		args = append(args, tipo)
+		argIdx++
+	}
+	if disc := c.Query("disciplina"); models.DisciplinaValida(disc, false) {
+		query += " AND r.disciplina = " + h.D.Param(argIdx)
+		args = append(args, disc)
 		argIdx++
 	}
 	if search := c.Query("search"); search != "" {
@@ -88,7 +93,7 @@ func (h *RegistroHandler) Get(c *gin.Context) {
 
 	var r models.Registro
 	err := h.DB.QueryRow(query, id).Scan(&r.ID, &r.MaquinaID, &r.MaquinaNombre, &r.Fecha,
-		&r.Tipo, &r.TecnicoID, &r.TecnicoNombre, &r.RegistradoPorID, &r.RegistradoPorNombre,
+		&r.Tipo, &r.Disciplina, &r.TecnicoID, &r.TecnicoNombre, &r.RegistradoPorID, &r.RegistradoPorNombre,
 		&r.ProximoMantenimiento, &r.Observaciones)
 
 	if err != nil {
@@ -107,10 +112,17 @@ func (h *RegistroHandler) ListByMaquina(c *gin.Context) {
 	query := h.listQuery() + " WHERE r.maquina_id = " + h.D.Param(1)
 	args := []interface{}{maquinaID}
 
+	argIdx := 2
 	// ?desde=YYYY-MM-DD limita el historial (ej: ultimos 3 meses en la vista QR)
 	if desde := c.Query("desde"); desde != "" {
-		query += " AND r.fecha >= " + h.D.Param(2)
+		query += " AND r.fecha >= " + h.D.Param(argIdx)
 		args = append(args, desde)
+		argIdx++
+	}
+	if disc := c.Query("disciplina"); models.DisciplinaValida(disc, false) {
+		query += " AND r.disciplina = " + h.D.Param(argIdx)
+		args = append(args, disc)
+		argIdx++
 	}
 	query += " ORDER BY r.fecha DESC"
 
@@ -145,6 +157,11 @@ func (h *RegistroHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Debe incluir al menos una parte intervenida o una tarea del checklist"})
 		return
 	}
+	if req.Disciplina != "" && !models.DisciplinaValida(req.Disciplina, false) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Disciplina invalida (Mecanico o Electrico)"})
+		return
+	}
+	req.Disciplina = models.DisciplinaODefault(req.Disciplina)
 
 	for _, t := range req.Tareas {
 		for _, res := range t.Resultados {
@@ -170,18 +187,18 @@ func (h *RegistroHandler) Create(c *gin.Context) {
 
 	// 1. Insert registro
 	insertReg := fmt.Sprintf(
-		"INSERT INTO Registros (maquina_id, fecha, tipo, tecnico_id, registrado_por_id, proximo_mantenimiento, observaciones) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-		h.D.Param(1), h.D.Param(2), h.D.Param(3), h.D.Param(4), h.D.Param(5), h.D.Param(6), h.D.Param(7))
+		"INSERT INTO Registros (maquina_id, fecha, tipo, tecnico_id, registrado_por_id, proximo_mantenimiento, observaciones, disciplina) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+		h.D.Param(1), h.D.Param(2), h.D.Param(3), h.D.Param(4), h.D.Param(5), h.D.Param(6), h.D.Param(7), h.D.Param(8))
 
 	if h.D.Type == db.SQLServer {
 		insertReg = fmt.Sprintf(
-			"INSERT INTO Registros (maquina_id, fecha, tipo, tecnico_id, registrado_por_id, proximo_mantenimiento, observaciones) OUTPUT INSERTED.id VALUES (%s, %s, %s, %s, %s, %s, %s)",
-			h.D.Param(1), h.D.Param(2), h.D.Param(3), h.D.Param(4), h.D.Param(5), h.D.Param(6), h.D.Param(7))
+			"INSERT INTO Registros (maquina_id, fecha, tipo, tecnico_id, registrado_por_id, proximo_mantenimiento, observaciones, disciplina) OUTPUT INSERTED.id VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+			h.D.Param(1), h.D.Param(2), h.D.Param(3), h.D.Param(4), h.D.Param(5), h.D.Param(6), h.D.Param(7), h.D.Param(8))
 	}
 
 	registroID, err := h.D.InsertAndGetID(tx, insertReg,
 		req.MaquinaID, req.Fecha, req.Tipo, req.TecnicoID, req.RegistradoPorID,
-		req.ProximoMantenimiento, req.Observaciones)
+		req.ProximoMantenimiento, req.Observaciones, req.Disciplina)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al crear registro", "detail": err.Error()})
 		return

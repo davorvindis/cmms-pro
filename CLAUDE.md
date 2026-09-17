@@ -17,6 +17,8 @@ Solicitado por Elvio, coordinado con Beto. Maciel/Gonzalo cargan registros vía 
 - Mantenimientos planificados (orden de trabajo: crear → hoja imprimible → volcar resultado → completar genera Registro).
 - Auditoría (middleware transversal: toda escritura a AuditLog, pin redactado; página solo admin).
 - Seguridad: PINs bcrypt (security/), rate limit login, auth por headers X-User-ID/X-Pin.
+- **Disciplina** (desde 2026-09-17, absorción de la app de Electrónica): `Mecanico|Electrico` en Tareas/Mantenimientos/Registros/Repuestos, Usuarios además `Ambas`. Todos ven todo; la UI se secciona con el selector de topbar (localStorage `cmms_disc`, arranca en la disciplina del usuario). Listados aceptan `?disciplina=`. Máquinas tienen `plc/hmi/hmi_estado/doc_url`. Helper `models.DisciplinaValida`.
+- **PWA**: `backend/static/manifest.webmanifest`, `sw.js` (API nunca cacheada; estáticos network-first) e `icons/`. Al cambiar estáticos que deban invalidar cache, subir `CACHE` en sw.js. Layout mobile ≤900px: sidebar drawer.
 
 ## Migraciones
 `backend/db/migrations/00N_*.sql` en AMBOS dialectos (sqlite + mssql), embebidas en `migrate.go`, corren al arrancar. Idempotentes (mssql: errores "already exists" se salatean). Columnas nuevas sobre tablas existentes → helper `ensureColumn`.

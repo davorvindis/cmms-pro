@@ -2,7 +2,7 @@
 -- Generado desde "Planilla Protos 100 ESPERT.xlsx" (maquina Hauni Protos 100)
 
 -- Usuarios (login por DNI, PIN inicial 000000)
-INSERT INTO Usuarios (id, nombre, rol, pin) VALUES ('admin', 'Administrador', 'Administrador', '1234');
+INSERT INTO Usuarios (id, nombre, rol, pin, disciplina) VALUES ('admin', 'Administrador', 'Administrador', '1234', 'Ambas');
 INSERT INTO Usuarios (id, nombre, rol, pin) VALUES ('23526066', 'Marcelo Maciel', 'Data Entry', '000000');
 INSERT INTO Usuarios (id, nombre, rol, pin) VALUES ('30102815', 'Gonzalo Gonzalez', 'Tecnico', '000000');
 

@@ -30,6 +30,7 @@ type Registro struct {
 	MaquinaNombre        string               `json:"maquina_nombre,omitempty"`
 	Fecha                string               `json:"fecha"`
 	Tipo                 string               `json:"tipo"`
+	Disciplina           string               `json:"disciplina"`
 	TecnicoID            string               `json:"tecnico_id"`
 	TecnicoNombre        string               `json:"tecnico_nombre,omitempty"`
 	RegistradoPorID      string               `json:"registrado_por_id"`
@@ -66,6 +67,7 @@ type CreateRegistroRequest struct {
 	MaquinaID            string                        `json:"maquina_id" binding:"required"`
 	Fecha                string                        `json:"fecha" binding:"required"`
 	Tipo                 string                        `json:"tipo" binding:"required"`
+	Disciplina           string                        `json:"disciplina"`
 	TecnicoID            string                        `json:"tecnico_id" binding:"required"`
 	RegistradoPorID      string                        `json:"registrado_por_id" binding:"required"`
 	ProximoMantenimiento *string                       `json:"proximo_mantenimiento"`

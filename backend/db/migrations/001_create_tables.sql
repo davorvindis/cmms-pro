@@ -9,6 +9,7 @@ CREATE TABLE Usuarios (
     pin            NVARCHAR(10)  NOT NULL DEFAULT '',
     puede_ingresar BIT           NOT NULL DEFAULT 1,
     estado         NVARCHAR(10)  NOT NULL DEFAULT 'Activo' CHECK (estado IN ('Activo', 'Inactivo')),
+    disciplina     NVARCHAR(10)  NOT NULL DEFAULT 'Mecanico' CHECK (disciplina IN ('Mecanico', 'Electrico', 'Ambas')),
     created_at     DATETIME2     NOT NULL DEFAULT GETDATE()
 );
 
@@ -23,6 +24,11 @@ CREATE TABLE Maquinas (
     proximo_mantenimiento     DATE          NULL,
     frecuencia_mantenimiento  NVARCHAR(20)  NOT NULL DEFAULT 'Trimestral'
                               CHECK (frecuencia_mantenimiento IN ('Mensual', 'Bimestral', 'Trimestral', 'Semestral', 'Anual')),
+    -- campos de electronica (familia PLC, modelo HMI, estado tecnologico HMI, link a documentacion)
+    plc                       NVARCHAR(100) NULL,
+    hmi                       NVARCHAR(100) NULL,
+    hmi_estado                NVARCHAR(100) NULL CHECK (hmi_estado IS NULL OR hmi_estado IN ('Vigente', 'Obsoleto', 'Pendiente de actualizacion', 'Desconocido')),
+    doc_url                   NVARCHAR(500) NULL,
     created_at                DATETIME2     NOT NULL DEFAULT GETDATE()
 );
 
@@ -68,6 +74,7 @@ CREATE TABLE Registros (
     fecha                 DATETIME2     NOT NULL,
     tipo                  NVARCHAR(20)  NOT NULL
                           CHECK (tipo IN ('Preventivo', 'Correctivo', 'Predictivo', 'Emergencia')),
+    disciplina            NVARCHAR(10)  NOT NULL DEFAULT 'Mecanico' CHECK (disciplina IN ('Mecanico', 'Electrico')),
     tecnico_id            NVARCHAR(50)  NOT NULL,
     registrado_por_id     NVARCHAR(50)  NOT NULL,
     proximo_mantenimiento DATE          NULL,

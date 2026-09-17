@@ -8,3 +8,6 @@
 - **Tests**: fixtures deben tener TODOS los campos que el código compara (puede_ingresar faltante rompió diff de edición); selectores de clase compartida entre forms (.btn-guardar) → escopear por contenedor; correr suite COMPLETA además de -g (fallas solo aparecen en corrida completa).
 - **static/**: copiar HTMLs editados a backend/static/ SIEMPRE (hay test que lo chequea desde 2026-08-07).
 - Usuario quiere avisos proactivos del progreso de tareas largas ("me vas a avisar o como es?") — reportar al terminar sin que pregunte.
+- **Layout mobile en flex**: `.main { flex:1 }` dentro de `.layout { display:flex }` tiene `min-width:auto` → cualquier hijo `nowrap` (topbar) ensancha la página entera y corre los `position:fixed`. Siempre `min-width:0` en el flex item principal + `overflow-x:hidden` en body para ≤900px. Verificar con captura real a 390px, no solo con tests.
+- **Smoke con curl desde zsh**: `$H` con varios `-H` NO se divide en palabras en zsh; usar array bash (`A=(-H ...); "${A[@]}"`) o `bash script.sh`.
+

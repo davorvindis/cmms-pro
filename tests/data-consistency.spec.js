@@ -315,3 +315,65 @@ test.describe('Tareas preventivas consistency', () => {
     expect(staticQr).toEqual(QR_SRC);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 11. Disciplina (Mecanico / Electrico) y PWA
+// ---------------------------------------------------------------------------
+
+test.describe('Disciplina consistency', () => {
+  const DISC = ['Mecanico', 'Electrico'];
+
+  const extractSelectValues = (html, selectId) => {
+    const re = new RegExp(`<select[^>]+id="${selectId}"[^>]*>([\\s\\S]*?)</select>`, 'i');
+    const m = html.match(re);
+    if (!m) return [];
+    return [...m[1].matchAll(/<option[^>]*value="([^"]*)"/g)].map((x) => x[1]);
+  };
+
+  test('us-disciplina offers Mecanico, Electrico and Ambas', () => {
+    expect(extractSelectValues(BACKOFFICE_SRC, 'us-disciplina')).toEqual([...DISC, 'Ambas']);
+  });
+
+  test('ta-disciplina, mant-disciplina and reg-disciplina offer exactly the 2 disciplinas', () => {
+    ['ta-disciplina', 'mant-disciplina', 'reg-disciplina'].forEach((id) => {
+      expect(extractSelectValues(BACKOFFICE_SRC, id)).toEqual(DISC);
+    });
+  });
+
+  test('qr.html qr-reg-disciplina matches backoffice reg-disciplina', () => {
+    expect(extractSelectValues(QR_SRC, 'qr-reg-disciplina')).toEqual(extractSelectValues(BACKOFFICE_SRC, 'reg-disciplina'));
+  });
+
+  test('topbar disc-switch has the 3 modes (Mecanico, Electrico, todas)', () => {
+    const m = BACKOFFICE_SRC.match(/<div class="disc-switch" id="disc-switch"[\s\S]*?<\/div>/);
+    expect(m).not.toBeNull();
+    const values = [...m[0].matchAll(/data-d="([^"]*)"/g)].map((x) => x[1]);
+    expect(values).toEqual([...DISC, '']);
+  });
+
+  test('eq-hmi-estado options match the backend CHECK constraint', () => {
+    const opts = extractSelectOptions(BACKOFFICE_SRC, 'eq-hmi-estado').filter((o) => o !== 'Sin dato');
+    expect(opts).toEqual(['Vigente', 'Obsoleto', 'Pendiente de actualizacion', 'Desconocido']);
+  });
+});
+
+test.describe('PWA wiring', () => {
+  const STATIC = path.join(ROOT, 'backend', 'static');
+
+  test('both pages link the manifest and register the service worker', () => {
+    [BACKOFFICE_SRC, QR_SRC].forEach((src) => {
+      expect(src).toContain('<link rel="manifest" href="/manifest.webmanifest">');
+      expect(src).toContain('<meta name="theme-color" content="#0f3460">');
+      expect(src).toContain("navigator.serviceWorker.register('/sw.js')");
+    });
+  });
+
+  test('manifest, sw.js and icons exist in backend/static', () => {
+    const manifest = JSON.parse(fs.readFileSync(path.join(STATIC, 'manifest.webmanifest'), 'utf8'));
+    expect(manifest.start_url).toBe('/backoffice.html');
+    expect(manifest.display).toBe('standalone');
+    manifest.icons.forEach((i) => expect(fs.existsSync(path.join(STATIC, i.src.replace(/^\//, '')))).toBe(true));
+    const sw = fs.readFileSync(path.join(STATIC, 'sw.js'), 'utf8');
+    expect(sw).toContain("url.pathname.startsWith('/api/')"); // la API nunca se cachea
+  });
+});

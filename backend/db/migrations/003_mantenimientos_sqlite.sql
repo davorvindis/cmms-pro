@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS Mantenimientos (
     horas_marcha     TEXT,
     horas_turbinas   TEXT,
     estado           TEXT NOT NULL DEFAULT 'Pendiente' CHECK (estado IN ('Pendiente', 'Completado')),
+    disciplina       TEXT NOT NULL DEFAULT 'Mecanico' CHECK (disciplina IN ('Mecanico', 'Electrico')),
     creado_por_id    TEXT NOT NULL,
     fecha_completado TEXT,
     registro_id      INTEGER,

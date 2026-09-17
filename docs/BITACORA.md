@@ -22,6 +22,14 @@
 - Auditoría de salud: backups Azure SQL PITR 7 días OK; máquina basura "a" borrada por Davor.
 - Regresión final: 132 pass / 50 fail (todos pre-existentes del prototipo).
 
+### 2026-09-17 — Absorción app Electrónica: disciplina transversal + PWA (v15, pendiente deploy)
+- Contexto: Gastón Lator (electrónica) traía por WhatsApp una app propia (Flutter + Supabase + Firebase, "Mantenimiento Expert", paquete 4) que duplicaba máquinas/preventivos/órdenes fuera de Azure y en cuentas personales. Decisión Davor: absorberla en CMMS. Opción elegida: **híbrida** — todos ven todo, UI seccionada por disciplina, filtro inicial = disciplina del usuario.
+- Backend: columna `disciplina` (`Mecanico|Electrico`, mismo vocabulario que Repuestos) en Tareas, Mantenimientos y Registros; en Usuarios además `Ambas` (admins existentes backfilleados a Ambas). Máquinas suma `plc`, `hmi`, `hmi_estado`, `doc_url` (campos que traía la app de Gastón). `?disciplina=` en todos los listados, dashboard stats y tareas de máquina. Completar mantenimiento hereda la disciplina al registro. Todo vía ensureColumn + migraciones base en ambos dialectos; smoke sobre copia de DB vieja OK.
+- Frontend: selector Mecánica / Electrónica / Todas en topbar (persistido en `cmms_disc`, se resetea al loguear), badges de disciplina en tareas/mantenimientos/registros, campo disciplina en alta de usuario/tarea/mantenimiento/registro (backoffice y QR), sección colapsable "Datos de electrónica" en máquina, ficha QR muestra PLC/HMI/doc. Hoja imprimible mantiene "Mecanico" para mecánica y dice "Tecnico" para electrónica.
+- PWA: `manifest.webmanifest` + `sw.js` (estáticos network-first con fallback cache, API nunca cacheada) + íconos en `backend/static/`, rutas en main.go. Layout mobile: sidebar → drawer con hamburguesa, stats 2 col, tablas con scroll, modales a pantalla. Verificado con capturas reales a 390px.
+- Tests: +7 backoffice (disciplina, campos electrónica, drawer) +7 consistencia (selects, PWA). Suite: 146 pass / 50 viejos de qr.spec (pre-existentes).
+- Fase 2 anotada en todo.md: minutas, 2 responsables + continuidad entre turnos, sugerencias de mejora, importar lo que Gastón cargó en Supabase.
+
 ## Estado
 - Prod: `ca-cmms-prod` imagen **cmms:v14**, DB cmms_db (Azure SQL, PITR 7d), ~USD 22/mes.
 - 11 máquinas, 484 tareas, 2.085 repuestos, auditoría activa.

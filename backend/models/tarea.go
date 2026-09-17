@@ -10,6 +10,7 @@ type Tarea struct {
 	Descripcion       *string `json:"descripcion"`
 	TiempoEstimadoMin *int    `json:"tiempo_estimado_min"`
 	Frecuencia        string  `json:"frecuencia"`
+	Disciplina        string  `json:"disciplina"`
 	AsignadoID        *string `json:"asignado_id"`
 	AsignadoNombre    *string `json:"asignado_nombre,omitempty"`
 	Orden             int     `json:"orden"`
@@ -25,6 +26,7 @@ type CreateTareaRequest struct {
 	Descripcion       *string `json:"descripcion"`
 	TiempoEstimadoMin *int    `json:"tiempo_estimado_min"`
 	Frecuencia        string  `json:"frecuencia" binding:"required,oneof=Semanal Quincenal Mensual Bimestral Trimestral Semestral Anual"`
+	Disciplina        string  `json:"disciplina"`
 	AsignadoID        *string `json:"asignado_id"`
 	Orden             int     `json:"orden"`
 }
@@ -34,6 +36,7 @@ type UpdateTareaRequest struct {
 	Descripcion       *string `json:"descripcion"`
 	TiempoEstimadoMin *int    `json:"tiempo_estimado_min"`
 	Frecuencia        *string `json:"frecuencia" binding:"omitempty,oneof=Semanal Quincenal Mensual Bimestral Trimestral Semestral Anual"`
+	Disciplina        *string `json:"disciplina"`
 	AsignadoID        *string `json:"asignado_id"`
 	Orden             *int    `json:"orden"`
 	Activa            *bool   `json:"activa"`

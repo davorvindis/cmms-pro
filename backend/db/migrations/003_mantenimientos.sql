@@ -8,6 +8,7 @@ CREATE TABLE Mantenimientos (
     horas_marcha     NVARCHAR(50)  NULL,
     horas_turbinas   NVARCHAR(50)  NULL,
     estado           NVARCHAR(20)  NOT NULL DEFAULT 'Pendiente' CHECK (estado IN ('Pendiente', 'Completado')),
+    disciplina       NVARCHAR(10)  NOT NULL DEFAULT 'Mecanico' CHECK (disciplina IN ('Mecanico', 'Electrico')),
     creado_por_id    NVARCHAR(50)  NOT NULL,
     fecha_completado DATETIME2     NULL,
     registro_id      INT           NULL,

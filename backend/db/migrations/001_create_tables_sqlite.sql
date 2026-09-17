@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS Usuarios (
     pin            TEXT NOT NULL DEFAULT '',
     puede_ingresar INTEGER NOT NULL DEFAULT 1,
     estado         TEXT NOT NULL DEFAULT 'Activo' CHECK (estado IN ('Activo', 'Inactivo')),
+    disciplina     TEXT NOT NULL DEFAULT 'Mecanico' CHECK (disciplina IN ('Mecanico', 'Electrico', 'Ambas')),
     created_at     TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -23,6 +24,11 @@ CREATE TABLE IF NOT EXISTS Maquinas (
     proximo_mantenimiento    TEXT,
     frecuencia_mantenimiento TEXT NOT NULL DEFAULT 'Trimestral'
                              CHECK (frecuencia_mantenimiento IN ('Mensual', 'Bimestral', 'Trimestral', 'Semestral', 'Anual')),
+    -- campos de electronica (familia PLC, modelo HMI, estado tecnologico HMI, link a documentacion)
+    plc                      TEXT,
+    hmi                      TEXT,
+    hmi_estado               TEXT CHECK (hmi_estado IS NULL OR hmi_estado IN ('Vigente', 'Obsoleto', 'Pendiente de actualizacion', 'Desconocido')),
+    doc_url                  TEXT,
     created_at               TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -68,6 +74,7 @@ CREATE TABLE IF NOT EXISTS Registros (
     maquina_id            TEXT NOT NULL,
     fecha                 TEXT NOT NULL,
     tipo                  TEXT NOT NULL CHECK (tipo IN ('Preventivo', 'Correctivo', 'Predictivo', 'Emergencia')),
+    disciplina            TEXT NOT NULL DEFAULT 'Mecanico' CHECK (disciplina IN ('Mecanico', 'Electrico')),
     tecnico_id            TEXT NOT NULL,
     registrado_por_id     TEXT NOT NULL,
     proximo_mantenimiento TEXT,

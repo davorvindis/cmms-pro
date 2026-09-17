@@ -7,6 +7,7 @@ type Usuario struct {
 	Pin           string `json:"-"`
 	PuedeIngresar bool   `json:"puede_ingresar"`
 	Estado        string `json:"estado"`
+	Disciplina    string `json:"disciplina"` // Mecanico | Electrico | Ambas
 }
 
 type LoginRequest struct {
@@ -21,6 +22,7 @@ type CreateUsuarioRequest struct {
 	Rol           string `json:"rol" binding:"required"`
 	Pin           string `json:"pin"`
 	PuedeIngresar bool   `json:"puede_ingresar"`
+	Disciplina    string `json:"disciplina"`
 }
 
 type UpdateUsuarioRequest struct {
@@ -29,4 +31,5 @@ type UpdateUsuarioRequest struct {
 	Pin           *string `json:"pin"`
 	PuedeIngresar *bool   `json:"puede_ingresar"`
 	Estado        *string `json:"estado"`
+	Disciplina    *string `json:"disciplina"`
 }

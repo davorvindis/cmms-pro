@@ -59,6 +59,30 @@ func Migrate(database *sql.DB, dialect Dialect) {
 		"TEXT NOT NULL DEFAULT 'Mecanico' CHECK (disciplina IN ('Mecanico', 'Electrico'))",
 		"NVARCHAR(10) NOT NULL DEFAULT 'Mecanico' CHECK (disciplina IN ('Mecanico', 'Electrico'))")
 
+	// Disciplina transversal (absorcion app Electronica, 2026-09). Mismo
+	// vocabulario que Repuestos; Usuarios ademas admite 'Ambas'.
+	if ensureColumn(database, dialect, "Usuarios", "disciplina",
+		"TEXT NOT NULL DEFAULT 'Mecanico' CHECK (disciplina IN ('Mecanico', 'Electrico', 'Ambas'))",
+		"NVARCHAR(10) NOT NULL DEFAULT 'Mecanico' CHECK (disciplina IN ('Mecanico', 'Electrico', 'Ambas'))") {
+		// Los admins existentes ven todo por defecto
+		if _, err := database.Exec("UPDATE Usuarios SET disciplina = 'Ambas' WHERE rol = 'Administrador'"); err != nil {
+			log.Printf("backfill Usuarios.disciplina admin: %v", err)
+		}
+	}
+	for _, table := range []string{"Tareas", "Mantenimientos", "Registros"} {
+		ensureColumn(database, dialect, table, "disciplina",
+			"TEXT NOT NULL DEFAULT 'Mecanico' CHECK (disciplina IN ('Mecanico', 'Electrico'))",
+			"NVARCHAR(10) NOT NULL DEFAULT 'Mecanico' CHECK (disciplina IN ('Mecanico', 'Electrico'))")
+	}
+
+	// Campos de electronica en Maquinas (familia PLC, HMI, estado HMI, doc)
+	ensureColumn(database, dialect, "Maquinas", "plc", "TEXT", "NVARCHAR(100) NULL")
+	ensureColumn(database, dialect, "Maquinas", "hmi", "TEXT", "NVARCHAR(100) NULL")
+	ensureColumn(database, dialect, "Maquinas", "hmi_estado",
+		"TEXT CHECK (hmi_estado IS NULL OR hmi_estado IN ('Vigente', 'Obsoleto', 'Pendiente de actualizacion', 'Desconocido'))",
+		"NVARCHAR(100) NULL CHECK (hmi_estado IS NULL OR hmi_estado IN ('Vigente', 'Obsoleto', 'Pendiente de actualizacion', 'Desconocido'))")
+	ensureColumn(database, dialect, "Maquinas", "doc_url", "TEXT", "NVARCHAR(500) NULL")
+
 	fmt.Println("Database migration completed")
 }
 
@@ -71,7 +95,8 @@ func isAlreadyExists(err error) bool {
 }
 
 // ensureColumn agrega una columna a una tabla existente si todavia no esta.
-func ensureColumn(database *sql.DB, dialect Dialect, table, column, sqliteDef, mssqlDef string) {
+// Devuelve true solo cuando la columna se creo en esta corrida (para backfills).
+func ensureColumn(database *sql.DB, dialect Dialect, table, column, sqliteDef, mssqlDef string) bool {
 	var count int
 	var checkQuery, alterStmt string
 	if dialect.Type == SQLite {
@@ -84,17 +109,19 @@ func ensureColumn(database *sql.DB, dialect Dialect, table, column, sqliteDef, m
 
 	if err := database.QueryRow(checkQuery).Scan(&count); err != nil {
 		log.Printf("ensureColumn %s.%s: check failed: %v", table, column, err)
-		return
+		return false
 	}
 	if count > 0 {
-		return
+		return false
 	}
 	if _, err := database.Exec(alterStmt); err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
-			return
+			return false
 		}
 		log.Printf("ensureColumn %s.%s: alter failed: %v", table, column, err)
+		return false
 	}
+	return true
 }
 
 // splitStatements splits SQL text on semicolons, handling multi-line statements.

@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CMMS - Registro de Mantenimiento</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚙️</text></svg>">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#0f3460">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CMMS Espert">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #eef1f5; color: #1a1a2e; min-height: 100vh; -webkit-font-smoothing: antialiased; }
@@ -39,6 +46,11 @@
   .componentes-label { font-size: 11px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.8px; margin: 14px 0 8px; }
   .componentes-grid { display: flex; flex-wrap: wrap; gap: 6px; }
   .comp-chip { padding: 5px 11px; border-radius: 8px; font-size: 12px; font-weight: 600; background: #eef2ff; color: #3b5998; border: 1px solid #dbe4ff; }
+  .disc-chip { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
+  .disc-chip.mec { background: #e8edf3; color: #0f3460; }
+  .disc-chip.ele { background: #fef3c7; color: #92400e; }
+  .electronica-line { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; font-size: 12px; color: #4b5563; align-items: center; }
+  .electronica-line a { color: #0f3460; font-weight: 600; }
 
   .ultimo-mant { display: flex; gap: 0; margin-top: 16px; border-top: 1px solid #f0f0f0; }
   .ultimo-mant-item { flex: 1; padding: 12px 0; text-align: center; }
@@ -296,6 +308,13 @@
       </select>
     </div>
     <div class="form-group">
+      <label>Disciplina</label>
+      <select id="qr-reg-disciplina" onchange="qrCargarTareas()">
+        <option value="Mecanico">Mecánica</option>
+        <option value="Electrico">Electrónica</option>
+      </select>
+    </div>
+    <div class="form-group">
       <label>Tecnico responsable</label>
       <select id="qr-reg-tecnico" onchange="qrTecnicoChange()"><option value="">Seleccionar tecnico...</option></select>
       <div id="qr-nueva-persona" style="display:none;margin-top:8px;padding:10px;background:white;border:1.5px dashed #cbd5e1;border-radius:10px;">
@@ -381,6 +400,16 @@ let componentesData = [];
 
 function authHeaders() { return { 'X-User-ID': currentUser?.id || '', 'X-Pin': currentPin }; }
 
+const QR_DISC_LABEL = { Mecanico: 'Mecánica', Electrico: 'Electrónica', Ambas: 'Ambas' };
+function qrDiscChip(d) {
+  if (d !== 'Mecanico' && d !== 'Electrico') return '';
+  return `<span class="disc-chip ${d === 'Electrico' ? 'ele' : 'mec'}">${QR_DISC_LABEL[d]}</span>`;
+}
+// Disciplina por defecto del formulario: la del usuario; con 'Ambas' arranca en Mecanica
+function qrDiscDefault() {
+  return currentUser?.disciplina === 'Electrico' ? 'Electrico' : 'Mecanico';
+}
+
 async function api(path, opts = {}) {
   const headers = { ...authHeaders(), ...opts.headers };
   if (opts.body) headers['Content-Type'] = 'application/json';
@@ -439,7 +468,7 @@ function logout() {
 function renderUserBadge() {
   const b = document.getElementById('user-badge');
   if (currentUser) {
-    b.innerHTML = `${currentUser.rol}: ${currentUser.nombre} &nbsp;·&nbsp; <span style="text-decoration:underline;">salir</span>`;
+    b.innerHTML = `${currentUser.rol}: ${currentUser.nombre}${QR_DISC_LABEL[currentUser.disciplina] ? ' · ' + QR_DISC_LABEL[currentUser.disciplina] : ''} &nbsp;·&nbsp; <span style="text-decoration:underline;">salir</span>`;
     b.onclick = () => { if (confirm('¿Cerrar sesion?')) logout(); };
   } else {
     b.textContent = 'Vista publica';
@@ -481,7 +510,7 @@ async function loadMantsPendientes() {
     <div class="tarea-card">
       <div class="tarea-card-head">
         <div>
-          <div class="tarea-nombre">${m.titulo}</div>
+          <div class="tarea-nombre">${m.titulo} ${qrDiscChip(m.disciplina)}</div>
           <div class="tarea-desc">${(m.items || []).length} tareas${m.horas_marcha ? ' · Horas: ' + m.horas_marcha : ''}</div>
         </div>
         <button class="btn-add-sm" style="width:auto;margin:0;border-style:solid;flex-shrink:0;" onclick="qrAbrirMant(${m.id})">Completar</button>
@@ -515,7 +544,7 @@ async function qrMostrarMant(id) {
     <div class="tarea-card" data-item-id="${it.id}">
       <div class="tarea-nombre">${it.seccion ? it.seccion + ' — ' : ''}${it.componente_nombre}</div>
       <div class="tarea-desc">${it.tarea}</div>
-      <select class="qr-mant-mecanico tarea-obs"><option value="">Mecanico...</option>${opciones}</select>
+      <select class="qr-mant-mecanico tarea-obs"><option value="">${qrMantActual.disciplina === 'Electrico' ? 'Tecnico' : 'Mecanico'}...</option>${opciones}</select>
       <input type="text" class="qr-mant-novedades tarea-obs" placeholder="Novedades (opcional)" value="${it.novedades || ''}">
       <input type="date" class="qr-mant-fecha tarea-obs" value="${it.fecha ? it.fecha.slice(0, 10) : hoy}">
     </div>`).join('');
@@ -571,6 +600,15 @@ function renderComponentesChips() {
   return componentesData.map(c => `<span class="comp-chip">${c.nombre}</span>`).join('');
 }
 
+function renderElectronicaLine(m) {
+  const partes = [];
+  if (m.plc) partes.push(`<span class="disc-chip ele">PLC ${m.plc}</span>`);
+  if (m.hmi) partes.push(`<span>HMI: ${m.hmi}${m.hmi_estado ? ' (' + m.hmi_estado + ')' : ''}</span>`);
+  else if (m.hmi_estado) partes.push(`<span>HMI: ${m.hmi_estado}</span>`);
+  if (m.doc_url && /^https?:\/\//i.test(m.doc_url)) partes.push(`<a href="${m.doc_url}" target="_blank" rel="noopener">Documentación ↗</a>`);
+  return partes.length ? `<div class="electronica-line">${partes.join('')}</div>` : '';
+}
+
 function renderEquipoCard() {
   const m = maquinaData;
   const fmtDate = d => d ? d.split(' ')[0].split('-').reverse().join('/') : '-';
@@ -586,6 +624,7 @@ function renderEquipoCard() {
         ${m.ubicacion}
       </div>
       <span class="status ${statusClass}">${m.estado}</span>
+      ${renderElectronicaLine(m)}
       <div class="componentes-label">Secciones de esta maquina</div>
       <div class="componentes-grid">${renderComponentesChips()}</div>
       <div class="ultimo-mant">
@@ -659,6 +698,7 @@ function renderHistorial() {
           <div class="hist-resumen">${resumen}</div>
         </div>
         <span class="hist-tipo ${r.tipo.toLowerCase()}">${r.tipo}</span>
+        ${qrDiscChip(r.disciplina)}
         <svg class="hist-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
       </div>
       <div class="hist-body">
@@ -719,10 +759,19 @@ function abrirFormRegistro() {
   mostrarFormRegistro();
 }
 
+async function qrCargarTareas() {
+  const disc = document.getElementById('qr-reg-disciplina').value;
+  qrTareas = await api(`/maquinas/${maquinaData.id}/tareas?disciplina=${disc}`) || [];
+  qrRenderTareas();
+  qrToggleTareas();
+}
+
 async function mostrarFormRegistro() {
   const usuarios = await api('/usuarios');
   if (!usuarios) return; // 401: se reabre el login
-  qrTareas = await api(`/maquinas/${maquinaData.id}/tareas`) || [];
+  document.getElementById('qr-reg-disciplina').value = qrDiscDefault();
+  const disc = document.getElementById('qr-reg-disciplina').value;
+  qrTareas = await api(`/maquinas/${maquinaData.id}/tareas?disciplina=${disc}`) || [];
   qrPoblarTecnicos(usuarios);
   document.getElementById('qr-nueva-persona').style.display = 'none';
   document.getElementById('qr-reg-proximo').value = '';
@@ -760,7 +809,7 @@ async function qrCrearPersona() {
   const dni = document.getElementById('qr-np-dni').value.trim();
   const rol = document.getElementById('qr-np-rol').value.trim();
   if (!nombre || !dni || !rol) { toast('Complete nombre, DNI y rol'); return; }
-  const res = await api('/usuarios', { method: 'POST', body: JSON.stringify({ id: dni, nombre, rol, puede_ingresar: false }) });
+  const res = await api('/usuarios', { method: 'POST', body: JSON.stringify({ id: dni, nombre, rol, disciplina: document.getElementById('qr-reg-disciplina').value, puede_ingresar: false }) });
   if (!res || res.error) { toast(res?.error || 'Error al crear persona'); return; }
   const usuarios = await api('/usuarios');
   qrPoblarTecnicos(usuarios || [], dni);
@@ -966,6 +1015,7 @@ async function guardarRegistroQR() {
     maquina_id: maquinaData.id,
     fecha,
     tipo: document.getElementById('qr-reg-tipo').value,
+    disciplina: document.getElementById('qr-reg-disciplina').value,
     tecnico_id: tecnicoId,
     registrado_por_id: currentUser.id,
     proximo_mantenimiento: document.getElementById('qr-reg-proximo').value || null,
@@ -983,6 +1033,10 @@ async function guardarRegistroQR() {
   }
 }
 
+// PWA: service worker (solo cuando lo sirve el backend; el server de tests no lo tiene)
+if ('serviceWorker' in navigator && location.port !== '8888') {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
 </script>
 </body>
 </html>

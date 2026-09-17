@@ -40,7 +40,7 @@ var ResultadosValidos = map[string]bool{
 
 func (h *TareaHandler) listQuery() string {
 	return fmt.Sprintf(`SELECT t.id, t.maquina_id, t.nombre, t.descripcion, t.tiempo_estimado_min,
-		t.frecuencia, t.asignado_id, u.nombre, t.orden, t.activa,
+		t.frecuencia, t.disciplina, t.asignado_id, u.nombre, t.orden, t.activa,
 		(SELECT %s FROM Registros r
 			JOIN RegistroTareas rt ON rt.registro_id = r.id
 			WHERE rt.tarea_id = t.id)
@@ -60,7 +60,7 @@ func (h *TareaHandler) queryTareas(query string, args ...interface{}) ([]models.
 	for rows.Next() {
 		var t models.Tarea
 		if err := rows.Scan(&t.ID, &t.MaquinaID, &t.Nombre, &t.Descripcion, &t.TiempoEstimadoMin,
-			&t.Frecuencia, &t.AsignadoID, &t.AsignadoNombre, &t.Orden, &t.Activa,
+			&t.Frecuencia, &t.Disciplina, &t.AsignadoID, &t.AsignadoNombre, &t.Orden, &t.Activa,
 			&t.UltimaEjecucion); err != nil {
 			continue
 		}
@@ -114,6 +114,11 @@ func (h *TareaHandler) List(c *gin.Context) {
 		args = append(args, activa)
 		argIdx++
 	}
+	if disc := c.Query("disciplina"); models.DisciplinaValida(disc, false) {
+		query += " AND t.disciplina = " + h.D.Param(argIdx)
+		args = append(args, disc)
+		argIdx++
+	}
 
 	query += " ORDER BY t.maquina_id, t.orden, t.id"
 
@@ -127,9 +132,15 @@ func (h *TareaHandler) List(c *gin.Context) {
 
 // ListByMaquina es publica (la usa la vista QR): solo tareas activas.
 func (h *TareaHandler) ListByMaquina(c *gin.Context) {
-	query := h.listQuery() + " WHERE t.maquina_id = " + h.D.Param(1) + " AND t.activa = 1 ORDER BY t.orden, t.id"
+	query := h.listQuery() + " WHERE t.maquina_id = " + h.D.Param(1) + " AND t.activa = 1"
+	args := []interface{}{c.Param("id")}
+	if disc := c.Query("disciplina"); models.DisciplinaValida(disc, false) {
+		query += " AND t.disciplina = " + h.D.Param(2)
+		args = append(args, disc)
+	}
+	query += " ORDER BY t.orden, t.id"
 
-	tareas, err := h.queryTareas(query, c.Param("id"))
+	tareas, err := h.queryTareas(query, args...)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al listar tareas"})
 		return
@@ -147,19 +158,24 @@ func (h *TareaHandler) Create(c *gin.Context) {
 	if req.AsignadoID != nil && *req.AsignadoID == "" {
 		req.AsignadoID = nil
 	}
+	if req.Disciplina != "" && !models.DisciplinaValida(req.Disciplina, false) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Disciplina invalida (Mecanico o Electrico)"})
+		return
+	}
+	req.Disciplina = models.DisciplinaODefault(req.Disciplina)
 
 	query := fmt.Sprintf(
-		"INSERT INTO Tareas (maquina_id, nombre, descripcion, tiempo_estimado_min, frecuencia, asignado_id, orden) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-		h.D.Param(1), h.D.Param(2), h.D.Param(3), h.D.Param(4), h.D.Param(5), h.D.Param(6), h.D.Param(7))
+		"INSERT INTO Tareas (maquina_id, nombre, descripcion, tiempo_estimado_min, frecuencia, asignado_id, orden, disciplina) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+		h.D.Param(1), h.D.Param(2), h.D.Param(3), h.D.Param(4), h.D.Param(5), h.D.Param(6), h.D.Param(7), h.D.Param(8))
 	if h.D.Type == db.SQLServer {
 		query = fmt.Sprintf(
-			"INSERT INTO Tareas (maquina_id, nombre, descripcion, tiempo_estimado_min, frecuencia, asignado_id, orden) OUTPUT INSERTED.id VALUES (%s, %s, %s, %s, %s, %s, %s)",
-			h.D.Param(1), h.D.Param(2), h.D.Param(3), h.D.Param(4), h.D.Param(5), h.D.Param(6), h.D.Param(7))
+			"INSERT INTO Tareas (maquina_id, nombre, descripcion, tiempo_estimado_min, frecuencia, asignado_id, orden, disciplina) OUTPUT INSERTED.id VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+			h.D.Param(1), h.D.Param(2), h.D.Param(3), h.D.Param(4), h.D.Param(5), h.D.Param(6), h.D.Param(7), h.D.Param(8))
 	}
 
 	id, err := h.D.InsertAndGetIDSingle(h.DB, query,
 		req.MaquinaID, req.Nombre, req.Descripcion, req.TiempoEstimadoMin,
-		req.Frecuencia, req.AsignadoID, req.Orden)
+		req.Frecuencia, req.AsignadoID, req.Orden, req.Disciplina)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al crear tarea", "detail": err.Error()})
 		return
@@ -198,6 +214,15 @@ func (h *TareaHandler) Update(c *gin.Context) {
 	if req.Frecuencia != nil {
 		sets = append(sets, "frecuencia = "+h.D.Param(argIdx))
 		args = append(args, *req.Frecuencia)
+		argIdx++
+	}
+	if req.Disciplina != nil {
+		if !models.DisciplinaValida(*req.Disciplina, false) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Disciplina invalida (Mecanico o Electrico)"})
+			return
+		}
+		sets = append(sets, "disciplina = "+h.D.Param(argIdx))
+		args = append(args, *req.Disciplina)
 		argIdx++
 	}
 	if req.AsignadoID != nil {

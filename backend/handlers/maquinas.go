@@ -19,7 +19,7 @@ type MaquinaHandler struct {
 
 func (h *MaquinaHandler) List(c *gin.Context) {
 	query := fmt.Sprintf(`SELECT id, nombre, ubicacion, serie, estado,
-		%s, %s, frecuencia_mantenimiento FROM Maquinas WHERE 1=1`,
+		%s, %s, frecuencia_mantenimiento, plc, hmi, hmi_estado, doc_url FROM Maquinas WHERE 1=1`,
 		h.D.DateToStr("ultimo_mantenimiento"), h.D.DateToStr("proximo_mantenimiento"))
 
 	var args []interface{}
@@ -45,7 +45,8 @@ func (h *MaquinaHandler) List(c *gin.Context) {
 	for rows.Next() {
 		var m models.Maquina
 		if err := rows.Scan(&m.ID, &m.Nombre, &m.Ubicacion, &m.Serie, &m.Estado,
-			&m.UltimoMantenimiento, &m.ProximoMantenimiento, &m.FrecuenciaMantenimiento); err != nil {
+			&m.UltimoMantenimiento, &m.ProximoMantenimiento, &m.FrecuenciaMantenimiento,
+			&m.Plc, &m.Hmi, &m.HmiEstado, &m.DocUrl); err != nil {
 			continue
 		}
 		m.Componentes = h.getComponentes(m.ID)
@@ -58,12 +59,13 @@ func (h *MaquinaHandler) Get(c *gin.Context) {
 	id := c.Param("id")
 
 	query := fmt.Sprintf(`SELECT id, nombre, ubicacion, serie, estado,
-		%s, %s, frecuencia_mantenimiento FROM Maquinas WHERE id = %s`,
+		%s, %s, frecuencia_mantenimiento, plc, hmi, hmi_estado, doc_url FROM Maquinas WHERE id = %s`,
 		h.D.DateToStr("ultimo_mantenimiento"), h.D.DateToStr("proximo_mantenimiento"), h.D.Param(1))
 
 	var m models.Maquina
 	err := h.DB.QueryRow(query, id).Scan(&m.ID, &m.Nombre, &m.Ubicacion, &m.Serie, &m.Estado,
-		&m.UltimoMantenimiento, &m.ProximoMantenimiento, &m.FrecuenciaMantenimiento)
+		&m.UltimoMantenimiento, &m.ProximoMantenimiento, &m.FrecuenciaMantenimiento,
+		&m.Plc, &m.Hmi, &m.HmiEstado, &m.DocUrl)
 
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Maquina no encontrada"})
@@ -81,6 +83,11 @@ func (h *MaquinaHandler) Create(c *gin.Context) {
 		return
 	}
 
+	if req.HmiEstado != nil && *req.HmiEstado != "" && !hmiEstadoValido(*req.HmiEstado) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Estado HMI invalido"})
+		return
+	}
+
 	tx, err := h.DB.Begin()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error de transaccion"})
@@ -89,10 +96,11 @@ func (h *MaquinaHandler) Create(c *gin.Context) {
 	defer tx.Rollback()
 
 	query := fmt.Sprintf(
-		"INSERT INTO Maquinas (id, nombre, ubicacion, serie, frecuencia_mantenimiento) VALUES (%s, %s, %s, %s, %s)",
-		h.D.Param(1), h.D.Param(2), h.D.Param(3), h.D.Param(4), h.D.Param(5))
+		"INSERT INTO Maquinas (id, nombre, ubicacion, serie, frecuencia_mantenimiento, plc, hmi, hmi_estado, doc_url) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+		h.D.Param(1), h.D.Param(2), h.D.Param(3), h.D.Param(4), h.D.Param(5), h.D.Param(6), h.D.Param(7), h.D.Param(8), h.D.Param(9))
 
-	_, err = tx.Exec(query, req.ID, req.Nombre, req.Ubicacion, req.Serie, req.FrecuenciaMantenimiento)
+	_, err = tx.Exec(query, req.ID, req.Nombre, req.Ubicacion, req.Serie, req.FrecuenciaMantenimiento,
+		nilIfBlank(req.Plc), nilIfBlank(req.Hmi), nilIfBlank(req.HmiEstado), nilIfBlank(req.DocUrl))
 	if err != nil {
 		c.JSON(http.StatusConflict, gin.H{"error": "La maquina ya existe o datos invalidos"})
 		return
@@ -152,6 +160,19 @@ func (h *MaquinaHandler) Update(c *gin.Context) {
 		args = append(args, *req.FrecuenciaMantenimiento)
 		argIdx++
 	}
+	// Campos de electronica: string vacio = limpiar (NULL)
+	if req.HmiEstado != nil && *req.HmiEstado != "" && !hmiEstadoValido(*req.HmiEstado) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Estado HMI invalido"})
+		return
+	}
+	for col, val := range map[string]*string{"plc": req.Plc, "hmi": req.Hmi, "hmi_estado": req.HmiEstado, "doc_url": req.DocUrl} {
+		if val == nil {
+			continue
+		}
+		sets = append(sets, col+" = "+h.D.Param(argIdx))
+		args = append(args, nilIfBlank(val))
+		argIdx++
+	}
 
 	if len(sets) == 0 && req.Componentes == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Nada que actualizar"})
@@ -189,6 +210,21 @@ func (h *MaquinaHandler) Update(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Maquina actualizada"})
+}
+
+// HmiEstadosValidos replica el CHECK de Maquinas.hmi_estado.
+var HmiEstadosValidos = map[string]bool{
+	"Vigente": true, "Obsoleto": true, "Pendiente de actualizacion": true, "Desconocido": true,
+}
+
+func hmiEstadoValido(s string) bool { return HmiEstadosValidos[s] }
+
+// nilIfBlank convierte "" en NULL para columnas opcionales.
+func nilIfBlank(s *string) interface{} {
+	if s == nil || strings.TrimSpace(*s) == "" {
+		return nil
+	}
+	return strings.TrimSpace(*s)
 }
 
 func (h *MaquinaHandler) Delete(c *gin.Context) {

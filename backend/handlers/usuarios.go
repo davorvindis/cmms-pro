@@ -31,12 +31,12 @@ func (h *UsuarioHandler) Login(c *gin.Context) {
 		return
 	}
 
-	query := "SELECT id, nombre, rol, pin, puede_ingresar, estado FROM Usuarios WHERE id = " + h.D.Param(1) +
+	query := "SELECT id, nombre, rol, pin, puede_ingresar, estado, disciplina FROM Usuarios WHERE id = " + h.D.Param(1) +
 		" AND pin <> '' AND puede_ingresar = 1 AND estado = 'Activo'"
 
 	var user models.Usuario
 	var stored string
-	err := h.DB.QueryRow(query, req.ID).Scan(&user.ID, &user.Nombre, &user.Rol, &stored, &user.PuedeIngresar, &user.Estado)
+	err := h.DB.QueryRow(query, req.ID).Scan(&user.ID, &user.Nombre, &user.Rol, &stored, &user.PuedeIngresar, &user.Estado, &user.Disciplina)
 	if err != nil || !security.CheckPin(stored, req.Pin) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Credenciales invalidas"})
 		return
@@ -54,13 +54,19 @@ func (h *UsuarioHandler) Login(c *gin.Context) {
 }
 
 func (h *UsuarioHandler) List(c *gin.Context) {
-	query := "SELECT id, nombre, rol, puede_ingresar, estado FROM Usuarios WHERE 1=1"
+	query := "SELECT id, nombre, rol, puede_ingresar, estado, disciplina FROM Usuarios WHERE 1=1"
 	var args []interface{}
 	argIdx := 1
 
 	if rol := c.Query("rol"); rol != "" {
 		query += " AND rol = " + h.D.Param(argIdx)
 		args = append(args, rol)
+		argIdx++
+	}
+	// ?disciplina=Mecanico|Electrico: incluye a los de esa disciplina y a los 'Ambas'
+	if disc := c.Query("disciplina"); models.DisciplinaValida(disc, false) {
+		query += " AND disciplina IN (" + h.D.Param(argIdx) + ", 'Ambas')"
+		args = append(args, disc)
 		argIdx++
 	}
 
@@ -76,7 +82,7 @@ func (h *UsuarioHandler) List(c *gin.Context) {
 	usuarios := []models.Usuario{}
 	for rows.Next() {
 		var u models.Usuario
-		if err := rows.Scan(&u.ID, &u.Nombre, &u.Rol, &u.PuedeIngresar, &u.Estado); err != nil {
+		if err := rows.Scan(&u.ID, &u.Nombre, &u.Rol, &u.PuedeIngresar, &u.Estado, &u.Disciplina); err != nil {
 			continue
 		}
 		usuarios = append(usuarios, u)
@@ -104,6 +110,13 @@ func (h *UsuarioHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Un usuario con acceso necesita PIN"})
 		return
 	}
+	if req.Disciplina == "" {
+		req.Disciplina = models.DisciplinaMecanico
+	}
+	if !models.DisciplinaValida(req.Disciplina, true) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Disciplina invalida (Mecanico, Electrico o Ambas)"})
+		return
+	}
 	if !req.PuedeIngresar {
 		req.Pin = "" // sin acceso, sin credenciales
 	}
@@ -115,10 +128,10 @@ func (h *UsuarioHandler) Create(c *gin.Context) {
 	if req.Pin != "" {
 		req.Pin = security.HashPin(req.Pin)
 	}
-	query := fmt.Sprintf("INSERT INTO Usuarios (id, nombre, rol, pin, puede_ingresar) VALUES (%s, %s, %s, %s, %s)",
-		h.D.Param(1), h.D.Param(2), h.D.Param(3), h.D.Param(4), h.D.Param(5))
+	query := fmt.Sprintf("INSERT INTO Usuarios (id, nombre, rol, pin, puede_ingresar, disciplina) VALUES (%s, %s, %s, %s, %s, %s)",
+		h.D.Param(1), h.D.Param(2), h.D.Param(3), h.D.Param(4), h.D.Param(5), h.D.Param(6))
 
-	_, err := h.DB.Exec(query, req.ID, req.Nombre, req.Rol, req.Pin, puede)
+	_, err := h.DB.Exec(query, req.ID, req.Nombre, req.Rol, req.Pin, puede, req.Disciplina)
 	if err != nil {
 		c.JSON(http.StatusConflict, gin.H{"error": "El usuario ya existe o datos invalidos"})
 		return
@@ -170,6 +183,15 @@ func (h *UsuarioHandler) Update(c *gin.Context) {
 	if req.Estado != nil {
 		sets = append(sets, "estado = "+h.D.Param(argIdx))
 		args = append(args, *req.Estado)
+		argIdx++
+	}
+	if req.Disciplina != nil {
+		if !models.DisciplinaValida(*req.Disciplina, true) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Disciplina invalida (Mecanico, Electrico o Ambas)"})
+			return
+		}
+		sets = append(sets, "disciplina = "+h.D.Param(argIdx))
+		args = append(args, *req.Disciplina)
 		argIdx++
 	}
 

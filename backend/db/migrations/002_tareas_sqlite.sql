@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS Tareas (
     frecuencia          TEXT NOT NULL DEFAULT 'Mensual'
                         CHECK (frecuencia IN ('Semanal', 'Quincenal', 'Mensual', 'Bimestral',
                                'Trimestral', 'Semestral', 'Anual')),
+    disciplina          TEXT NOT NULL DEFAULT 'Mecanico' CHECK (disciplina IN ('Mecanico', 'Electrico')),
     asignado_id         TEXT,
     orden               INTEGER NOT NULL DEFAULT 0,
     activa              INTEGER NOT NULL DEFAULT 1,

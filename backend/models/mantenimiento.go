@@ -10,6 +10,7 @@ type Mantenimiento struct {
 	HorasMarcha     *string             `json:"horas_marcha"`
 	HorasTurbinas   *string             `json:"horas_turbinas"`
 	Estado          string              `json:"estado"` // Pendiente | Completado
+	Disciplina      string              `json:"disciplina"`
 	CreadoPorID     string              `json:"creado_por_id"`
 	CreadoPorNombre string              `json:"creado_por_nombre,omitempty"`
 	FechaCompletado *string             `json:"fecha_completado"`
@@ -42,6 +43,7 @@ type CreateMantenimientoRequest struct {
 	Titulo        string              `json:"titulo" binding:"required"`
 	HorasMarcha   *string             `json:"horas_marcha"`
 	HorasTurbinas *string             `json:"horas_turbinas"`
+	Disciplina    string              `json:"disciplina"`
 	Items         []CreateMantItemReq `json:"items" binding:"required,min=1"`
 }
 

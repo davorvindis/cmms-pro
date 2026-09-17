@@ -22,12 +22,12 @@ func AuthRequired(database *sql.DB, dialect db.Dialect) gin.HandlerFunc {
 			return
 		}
 
-		query := "SELECT id, nombre, rol, pin, estado FROM Usuarios WHERE id = " + dialect.Param(1) +
+		query := "SELECT id, nombre, rol, pin, estado, disciplina FROM Usuarios WHERE id = " + dialect.Param(1) +
 			" AND pin <> '' AND puede_ingresar = 1 AND estado = 'Activo'"
 
 		var user models.Usuario
 		var stored string
-		err := database.QueryRow(query, userID).Scan(&user.ID, &user.Nombre, &user.Rol, &stored, &user.Estado)
+		err := database.QueryRow(query, userID).Scan(&user.ID, &user.Nombre, &user.Rol, &stored, &user.Estado, &user.Disciplina)
 
 		if err != nil || !security.CheckPin(stored, pin) {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Credenciales invalidas"})

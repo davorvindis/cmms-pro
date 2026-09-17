@@ -57,6 +57,19 @@ func main() {
 	r.StaticFile("/backoffice.html", "./static/backoffice.html")
 	r.StaticFile("/qr.html", "./static/qr.html")
 
+	// PWA: manifest, service worker e iconos (archivos en static/)
+	r.GET("/manifest.webmanifest", func(c *gin.Context) {
+		c.Header("Content-Type", "application/manifest+json")
+		c.File("./static/manifest.webmanifest")
+	})
+	r.GET("/sw.js", func(c *gin.Context) {
+		c.Header("Content-Type", "application/javascript")
+		c.Header("Service-Worker-Allowed", "/")
+		c.Header("Cache-Control", "no-cache")
+		c.File("./static/sw.js")
+	})
+	r.Static("/icons", "./static/icons")
+
 	// Handlers
 	maquinaH := &handlers.MaquinaHandler{DB: database, D: dialect}
 	repuestoH := &handlers.RepuestoHandler{DB: database, D: dialect}

@@ -981,3 +981,107 @@ test.describe('Eliminar registro desde detalle', () => {
     await expect(page.locator('.toast-ok')).toContainText('Registro eliminado');
   });
 });
+
+// ---------------------------------------------------------------------------
+// 17. Disciplina (Mecanica / Electronica / Todas) — seccionado de la app
+// ---------------------------------------------------------------------------
+
+test.describe('Disciplina', () => {
+  // Usuario de electronica: la app arranca filtrada en su disciplina
+  async function openComoElectronico(page) {
+    await mockApi(page);
+    await page.addInitScript(({ user }) => {
+      localStorage.setItem('cmms_user', JSON.stringify(user));
+      localStorage.setItem('cmms_pin', '1234');
+    }, { user: { ...FIXTURES.users.admin, disciplina: 'Electrico' } });
+    // Las rutas mockeadas son exactas: se agregan las variantes con ?disciplina=
+    await page.route(/\/api\/(dashboard\/stats|dashboard\/alertas|dashboard\/actividad|registros|tareas|mantenimientos|tareas-sugeridas)\?disciplina=/, (route) => {
+      const url = route.request().url();
+      const body = url.includes('/dashboard/stats')
+        ? { maquinas_activas: 1, mantenimientos_pendientes: 0, maquinas_vencidas: 0, registros_este_mes: 0, repuestos_stock_bajo: 0, tareas_vencidas: 0, mantenimientos_planificados_pendientes: 0 }
+        : [];
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+    });
+    await page.goto('/backoffice.html');
+    await expect(page.locator('#login-overlay')).not.toHaveClass(/show/, { timeout: 5_000 });
+  }
+
+  test('admin sin disciplina (o Ambas) arranca en "Todas" y no manda el parametro', async ({ page }) => {
+    await openBackoffice(page);
+    await expect(page.locator('#disc-switch button[data-d=""]')).toHaveClass(/active/);
+    const req = page.waitForRequest((r) => r.url().includes('/api/tareas') && r.method() === 'GET');
+    await page.click('text=Tareas Preventivas');
+    expect((await req).url()).not.toContain('disciplina=');
+  });
+
+  test('usuario de electronica arranca filtrado y las listas piden ?disciplina=Electrico', async ({ page }) => {
+    await openComoElectronico(page);
+    await expect(page.locator('#disc-switch button[data-d="Electrico"]')).toHaveClass(/active/);
+    const req = page.waitForRequest((r) => r.url().includes('/api/tareas') && r.method() === 'GET');
+    await page.click('text=Tareas Preventivas');
+    expect((await req).url()).toContain('disciplina=Electrico');
+  });
+
+  test('cambiar a "Todas" recarga la pagina activa sin filtro y se recuerda', async ({ page }) => {
+    await openComoElectronico(page);
+    await page.click('text=Tareas Preventivas');
+    const req = page.waitForRequest((r) => r.url().endsWith('/api/tareas') && r.method() === 'GET');
+    await page.click('#disc-switch button[data-d=""]');
+    await req;
+    await expect(page.locator('#disc-switch button[data-d=""]')).toHaveClass(/active/);
+    expect(await page.evaluate(() => localStorage.getItem('cmms_disc'))).toBe('');
+  });
+
+  test('nueva tarea manda la disciplina elegida', async ({ page }) => {
+    await openComoElectronico(page);
+    await page.click('text=Tareas Preventivas');
+    await page.click('button:has-text("+ Nueva Tarea")');
+    await expect(page.locator('#ta-disciplina')).toHaveValue('Electrico');
+    await page.fill('#ta-nombre', 'Revisar tablero');
+    const requestPromise = page.waitForRequest((r) => r.url().endsWith('/api/tareas') && r.method() === 'POST');
+    await page.click('#modal-tarea button:has-text("Guardar")');
+    const payload = JSON.parse((await requestPromise).postData() || '{}');
+    expect(payload.disciplina).toBe('Electrico');
+  });
+
+  test('nuevo usuario manda disciplina y la tabla la muestra', async ({ page }) => {
+    await openBackoffice(page);
+    await page.click('text=Tecnicos & Usuarios');
+    await page.click('button:has-text("+ Nuevo Usuario")');
+    await page.fill('#us-nombre', 'Gaston Lator');
+    await page.fill('#us-dni', '11111111');
+    await page.fill('#us-rol', 'Electronico');
+    await page.selectOption('#us-disciplina', 'Electrico');
+    const requestPromise = page.waitForRequest((r) => r.url().endsWith('/api/usuarios') && r.method() === 'POST');
+    await page.click('#btn-guardar-usuario');
+    const payload = JSON.parse((await requestPromise).postData() || '{}');
+    expect(payload.disciplina).toBe('Electrico');
+  });
+
+  test('editar maquina manda plc / hmi / doc_url', async ({ page }) => {
+    await openBackoffice(page);
+    await page.click('text=Maquinas / Activos');
+    await page.locator('#equipos-tbody tr').first().locator('button:has-text("Editar")').click();
+    await page.click('#eq-electronica summary'); // seccion colapsada si la maquina no tiene datos de electronica
+    await page.selectOption('#eq-plc', 'S7-1500');
+    await page.fill('#eq-hmi', 'KTP700');
+    await page.selectOption('#eq-hmi-estado', 'Vigente');
+    await page.fill('#eq-doc-url', 'https://docs.example.com/maq');
+    const requestPromise = page.waitForRequest((r) => /\/api\/maquinas\/[^/]+$/.test(r.url()) && r.method() === 'PUT');
+    await page.click('#btn-guardar-equipo');
+    const payload = JSON.parse((await requestPromise).postData() || '{}');
+    expect(payload).toMatchObject({ plc: 'S7-1500', hmi: 'KTP700', hmi_estado: 'Vigente', doc_url: 'https://docs.example.com/maq' });
+  });
+
+  test('en mobile el sidebar es un drawer que abre con la hamburguesa', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 800 });
+    await openBackoffice(page);
+    await expect(page.locator('.menu-btn')).toBeVisible();
+    await expect(page.locator('.sidebar')).not.toHaveClass(/open/);
+    await page.click('.menu-btn');
+    await expect(page.locator('.sidebar')).toHaveClass(/open/);
+    await page.click('.sidebar a:has-text("Repuestos")');
+    await expect(page.locator('.sidebar')).not.toHaveClass(/open/);
+    await expect(page.locator('#page-repuestos')).toHaveClass(/active/);
+  });
+});

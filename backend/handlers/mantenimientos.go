@@ -23,7 +23,7 @@ var tareasSemilla = []string{"limpieza", "control de correas", "controlar", "lub
 
 func (h *MantenimientoHandler) baseQuery() string {
 	return fmt.Sprintf(`SELECT m.id, m.maquina_id, maq.nombre, m.titulo, m.horas_marcha, m.horas_turbinas,
-		m.estado, m.creado_por_id, u.nombre, %s, m.registro_id, %s
+		m.estado, m.disciplina, m.creado_por_id, u.nombre, %s, m.registro_id, %s
 		FROM Mantenimientos m
 		JOIN Maquinas maq ON m.maquina_id = maq.id
 		JOIN Usuarios u ON m.creado_por_id = u.id`,
@@ -33,7 +33,7 @@ func (h *MantenimientoHandler) baseQuery() string {
 func (h *MantenimientoHandler) scanMantenimiento(scan func(dest ...interface{}) error) (models.Mantenimiento, error) {
 	var m models.Mantenimiento
 	err := scan(&m.ID, &m.MaquinaID, &m.MaquinaNombre, &m.Titulo, &m.HorasMarcha, &m.HorasTurbinas,
-		&m.Estado, &m.CreadoPorID, &m.CreadoPorNombre, &m.FechaCompletado, &m.RegistroID, &m.CreatedAt)
+		&m.Estado, &m.Disciplina, &m.CreadoPorID, &m.CreadoPorNombre, &m.FechaCompletado, &m.RegistroID, &m.CreatedAt)
 	return m, err
 }
 
@@ -98,6 +98,11 @@ func (h *MantenimientoHandler) List(c *gin.Context) {
 		args = append(args, estado)
 		argIdx++
 	}
+	if disc := c.Query("disciplina"); models.DisciplinaValida(disc, false) {
+		query += " AND m.disciplina = " + h.D.Param(argIdx)
+		args = append(args, disc)
+		argIdx++
+	}
 	query += " ORDER BY m.id DESC"
 
 	mants, err := h.queryList(query, args...)
@@ -112,9 +117,16 @@ func (h *MantenimientoHandler) List(c *gin.Context) {
 func (h *MantenimientoHandler) ListByMaquina(c *gin.Context) {
 	query := h.baseQuery() + " WHERE m.maquina_id = " + h.D.Param(1)
 	args := []interface{}{c.Param("id")}
+	argIdx := 2
 	if estado := c.Query("estado"); estado != "" {
-		query += " AND m.estado = " + h.D.Param(2)
+		query += " AND m.estado = " + h.D.Param(argIdx)
 		args = append(args, estado)
+		argIdx++
+	}
+	if disc := c.Query("disciplina"); models.DisciplinaValida(disc, false) {
+		query += " AND m.disciplina = " + h.D.Param(argIdx)
+		args = append(args, disc)
+		argIdx++
 	}
 	query += " ORDER BY m.id DESC"
 
@@ -146,6 +158,12 @@ func (h *MantenimientoHandler) Create(c *gin.Context) {
 
 	user := c.MustGet("user").(models.Usuario)
 
+	if req.Disciplina != "" && !models.DisciplinaValida(req.Disciplina, false) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Disciplina invalida (Mecanico o Electrico)"})
+		return
+	}
+	req.Disciplina = models.DisciplinaODefault(req.Disciplina)
+
 	// Validar que cada conjunto pertenezca a la maquina
 	checkComp := fmt.Sprintf("SELECT COUNT(*) FROM Componentes WHERE id = %s AND maquina_id = %s", h.D.Param(1), h.D.Param(2))
 	for _, it := range req.Items {
@@ -164,15 +182,15 @@ func (h *MantenimientoHandler) Create(c *gin.Context) {
 	defer tx.Rollback()
 
 	insertMant := fmt.Sprintf(
-		"INSERT INTO Mantenimientos (maquina_id, titulo, horas_marcha, horas_turbinas, creado_por_id) VALUES (%s, %s, %s, %s, %s)",
-		h.D.Param(1), h.D.Param(2), h.D.Param(3), h.D.Param(4), h.D.Param(5))
+		"INSERT INTO Mantenimientos (maquina_id, titulo, horas_marcha, horas_turbinas, creado_por_id, disciplina) VALUES (%s, %s, %s, %s, %s, %s)",
+		h.D.Param(1), h.D.Param(2), h.D.Param(3), h.D.Param(4), h.D.Param(5), h.D.Param(6))
 	if h.D.Type == db.SQLServer {
 		insertMant = fmt.Sprintf(
-			"INSERT INTO Mantenimientos (maquina_id, titulo, horas_marcha, horas_turbinas, creado_por_id) OUTPUT INSERTED.id VALUES (%s, %s, %s, %s, %s)",
-			h.D.Param(1), h.D.Param(2), h.D.Param(3), h.D.Param(4), h.D.Param(5))
+			"INSERT INTO Mantenimientos (maquina_id, titulo, horas_marcha, horas_turbinas, creado_por_id, disciplina) OUTPUT INSERTED.id VALUES (%s, %s, %s, %s, %s, %s)",
+			h.D.Param(1), h.D.Param(2), h.D.Param(3), h.D.Param(4), h.D.Param(5), h.D.Param(6))
 	}
 
-	mantID, err := h.D.InsertAndGetID(tx, insertMant, req.MaquinaID, req.Titulo, req.HorasMarcha, req.HorasTurbinas, user.ID)
+	mantID, err := h.D.InsertAndGetID(tx, insertMant, req.MaquinaID, req.Titulo, req.HorasMarcha, req.HorasTurbinas, user.ID, req.Disciplina)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al crear mantenimiento", "detail": err.Error()})
 		return
@@ -197,10 +215,16 @@ func (h *MantenimientoHandler) Create(c *gin.Context) {
 
 // getEstado devuelve estado y maquina_id, o error si no existe.
 func (h *MantenimientoHandler) getEstado(id string) (string, string, error) {
-	var estado, maquinaID string
-	query := fmt.Sprintf("SELECT estado, maquina_id FROM Mantenimientos WHERE id = %s", h.D.Param(1))
-	err := h.DB.QueryRow(query, id).Scan(&estado, &maquinaID)
+	estado, maquinaID, _, err := h.getEstadoDisc(id)
 	return estado, maquinaID, err
+}
+
+// getEstadoDisc devuelve ademas la disciplina (el Registro generado la hereda).
+func (h *MantenimientoHandler) getEstadoDisc(id string) (string, string, string, error) {
+	var estado, maquinaID, disciplina string
+	query := fmt.Sprintf("SELECT estado, maquina_id, disciplina FROM Mantenimientos WHERE id = %s", h.D.Param(1))
+	err := h.DB.QueryRow(query, id).Scan(&estado, &maquinaID, &disciplina)
+	return estado, maquinaID, disciplina, err
 }
 
 // applyItems aplica los resultados por item dentro de la tx.
@@ -336,7 +360,7 @@ func (h *MantenimientoHandler) Completar(c *gin.Context) {
 
 	user := c.MustGet("user").(models.Usuario)
 
-	estado, maquinaID, err := h.getEstado(id)
+	estado, maquinaID, disciplina, err := h.getEstadoDisc(id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Mantenimiento no encontrado"})
 		return
@@ -395,14 +419,14 @@ func (h *MantenimientoHandler) Completar(c *gin.Context) {
 	now := time.Now()
 	fecha := now.Format("2006-01-02 15:04")
 	insertReg := fmt.Sprintf(
-		"INSERT INTO Registros (maquina_id, fecha, tipo, tecnico_id, registrado_por_id, proximo_mantenimiento, observaciones) VALUES (%s, %s, 'Preventivo', %s, %s, NULL, %s)",
-		h.D.Param(1), h.D.Param(2), h.D.Param(3), h.D.Param(4), h.D.Param(5))
+		"INSERT INTO Registros (maquina_id, fecha, tipo, tecnico_id, registrado_por_id, proximo_mantenimiento, observaciones, disciplina) VALUES (%s, %s, 'Preventivo', %s, %s, NULL, %s, %s)",
+		h.D.Param(1), h.D.Param(2), h.D.Param(3), h.D.Param(4), h.D.Param(5), h.D.Param(6))
 	if h.D.Type == db.SQLServer {
 		insertReg = fmt.Sprintf(
-			"INSERT INTO Registros (maquina_id, fecha, tipo, tecnico_id, registrado_por_id, proximo_mantenimiento, observaciones) OUTPUT INSERTED.id VALUES (%s, %s, 'Preventivo', %s, %s, NULL, %s)",
-			h.D.Param(1), h.D.Param(2), h.D.Param(3), h.D.Param(4), h.D.Param(5))
+			"INSERT INTO Registros (maquina_id, fecha, tipo, tecnico_id, registrado_por_id, proximo_mantenimiento, observaciones, disciplina) OUTPUT INSERTED.id VALUES (%s, %s, 'Preventivo', %s, %s, NULL, %s, %s)",
+			h.D.Param(1), h.D.Param(2), h.D.Param(3), h.D.Param(4), h.D.Param(5), h.D.Param(6))
 	}
-	registroID, err := h.D.InsertAndGetID(tx, insertReg, maquinaID, fecha, req.TecnicoID, user.ID, req.Observaciones)
+	registroID, err := h.D.InsertAndGetID(tx, insertReg, maquinaID, fecha, req.TecnicoID, user.ID, req.Observaciones, disciplina)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al generar registro", "detail": err.Error()})
 		return
@@ -466,7 +490,14 @@ func (h *MantenimientoHandler) TareasSugeridas(c *gin.Context) {
 		seen[t] = true
 	}
 
-	rows, err := h.DB.Query("SELECT DISTINCT tarea FROM MantenimientoItems ORDER BY tarea")
+	q := "SELECT DISTINCT mi.tarea FROM MantenimientoItems mi"
+	var args []interface{}
+	if disc := c.Query("disciplina"); models.DisciplinaValida(disc, false) {
+		q += " JOIN Mantenimientos m ON mi.mantenimiento_id = m.id WHERE m.disciplina = " + h.D.Param(1)
+		args = append(args, disc)
+	}
+	q += " ORDER BY mi.tarea"
+	rows, err := h.DB.Query(q, args...)
 	if err == nil {
 		defer rows.Close()
 		for rows.Next() {

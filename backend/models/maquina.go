@@ -16,6 +16,10 @@ type Maquina struct {
 	UltimoMantenimiento     *string      `json:"ultimo_mantenimiento"`
 	ProximoMantenimiento    *string      `json:"proximo_mantenimiento"`
 	FrecuenciaMantenimiento string       `json:"frecuencia_mantenimiento"`
+	Plc                     *string      `json:"plc"`
+	Hmi                     *string      `json:"hmi"`
+	HmiEstado               *string      `json:"hmi_estado"`
+	DocUrl                  *string      `json:"doc_url"`
 	Componentes             []Componente `json:"componentes"`
 }
 
@@ -25,6 +29,10 @@ type CreateMaquinaRequest struct {
 	Ubicacion               string   `json:"ubicacion" binding:"required"`
 	Serie                   *string  `json:"serie"`
 	FrecuenciaMantenimiento string   `json:"frecuencia_mantenimiento" binding:"required"`
+	Plc                     *string  `json:"plc"`
+	Hmi                     *string  `json:"hmi"`
+	HmiEstado               *string  `json:"hmi_estado"`
+	DocUrl                  *string  `json:"doc_url"`
 	Componentes             []string `json:"componentes"`
 }
 
@@ -34,5 +42,9 @@ type UpdateMaquinaRequest struct {
 	Serie                   *string  `json:"serie"`
 	Estado                  *string  `json:"estado"`
 	FrecuenciaMantenimiento *string  `json:"frecuencia_mantenimiento"`
+	Plc                     *string  `json:"plc"`
+	Hmi                     *string  `json:"hmi"`
+	HmiEstado               *string  `json:"hmi_estado"`
+	DocUrl                  *string  `json:"doc_url"`
 	Componentes             []string `json:"componentes"`
 }

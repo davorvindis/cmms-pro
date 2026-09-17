@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CMMS Pro - Backoffice</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚙️</text></svg>">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#0f3460">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CMMS Espert">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #1a1a2e; }
@@ -183,6 +190,54 @@
   }
 
   @media (max-width: 1200px) { .stats { grid-template-columns: repeat(2, 1fr); } .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+  /* Selector de disciplina (Mecanica / Electronica / Todas) */
+  .disc-switch { display: inline-flex; background: #eef1f5; border-radius: 10px; padding: 3px; gap: 2px; }
+  .disc-switch button { border: none; background: transparent; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; color: #6b7280; cursor: pointer; font-family: inherit; white-space: nowrap; }
+  .disc-switch button.active { background: white; color: #0f3460; box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
+  .disc-switch button.active[data-d="Electrico"] { color: #b45309; }
+  .badge-disc-mec { background: #e8edf3; color: #0f3460; }
+  .badge-disc-ele { background: #fef3c7; color: #92400e; }
+  .menu-btn { display: none; background: none; border: none; cursor: pointer; padding: 4px; margin-right: 10px; color: #16213e; }
+  .menu-btn svg { width: 26px; height: 26px; }
+  .sidebar-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 49; }
+  .topbar .titlewrap { display: flex; align-items: center; min-width: 0; }
+
+  /* Mobile / PWA: sidebar como drawer, tablas con scroll, modales a pantalla */
+  @media (max-width: 900px) {
+    html, body { overflow-x: hidden; }
+    .layout { overflow-x: clip; }
+    .sidebar { transform: translateX(-100%); transition: transform 0.22s ease; z-index: 50; width: 264px; box-shadow: 4px 0 24px rgba(0,0,0,0.3); }
+    .sidebar.open { transform: none; }
+    .sidebar-backdrop.show { display: block; }
+    .main { margin-left: 0; min-width: 0; max-width: 100vw; }
+    .menu-btn { display: inline-flex; margin-right: 6px; }
+    .topbar { padding: 8px 10px; gap: 6px; }
+    .topbar .titlewrap { flex: 1 1 auto; min-width: 0; }
+    .topbar h2 { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .topbar .user { gap: 6px; flex-shrink: 0; }
+    .topbar #topbar-user, .topbar .avatar { display: none; }
+    .topbar .user .btn { padding: 6px 8px; margin-left: 4px !important; }
+    .disc-switch button { padding: 6px 7px; font-size: 11px; }
+    .content { padding: 12px; }
+    .stats { grid-template-columns: repeat(2, 1fr) !important; gap: 10px; margin-bottom: 14px; }
+    .stat-card { padding: 14px; }
+    .stat-card .value { font-size: 22px; }
+    .panel { overflow-x: auto; margin-bottom: 14px; }
+    .panel-header { padding: 12px 14px; position: static !important; }
+    .panel-header .actions { flex-wrap: wrap; width: 100%; }
+    .panel-header .actions .search-input { width: 100% !important; flex: 1 1 100%; }
+    .panel-header .actions select.search-input { width: auto !important; flex: 1 1 45%; min-width: 0; max-width: 100%; }
+    .panel-header .actions .btn-primary { flex: 1 1 100%; }
+    table { min-width: 640px; }
+    th, td { padding: 9px 12px; font-size: 13px; }
+    .modal { width: calc(100vw - 16px) !important; max-height: 94vh; }
+    .modal-body { padding: 14px; }
+    .cal-dia { min-height: 64px; padding: 3px 4px; }
+    .cal-evento { font-size: 9px; padding: 2px 4px; }
+    .bar-chart { gap: 4px; padding: 0 8px; }
+    #toast-cont { left: 12px; right: 12px; bottom: 12px; align-items: center; }
+  }
 /* Toasts */
 #toast-cont { position: fixed; bottom: 18px; right: 18px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
 .toast { padding: 11px 16px; border-radius: 10px; color: white; font-size: 13px; font-weight: 600; box-shadow: 0 4px 14px rgba(0,0,0,0.18); animation: toastin 0.25s ease; max-width: 340px; }
@@ -268,10 +323,22 @@
     </nav>
   </aside>
 
+  <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="cerrarMenu()"></div>
+
   <div class="main">
     <div class="topbar">
-      <h2 id="page-title">Dashboard</h2>
+      <div class="titlewrap">
+        <button class="menu-btn" onclick="toggleMenu()" aria-label="Menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <h2 id="page-title">Dashboard</h2>
+      </div>
       <div class="user">
+        <div class="disc-switch" id="disc-switch" title="Disciplina que se muestra">
+          <button data-d="Mecanico" onclick="setDisciplina('Mecanico')">Mecánica</button>
+          <button data-d="Electrico" onclick="setDisciplina('Electrico')">Electrónica</button>
+          <button data-d="" onclick="setDisciplina('')">Todas</button>
+        </div>
         <span id="topbar-user">Admin</span>
         <div class="avatar" id="topbar-avatar">DV</div>
         <button class="btn btn-sm" style="background:#f8d7da;color:#721c24;margin-left:8px;" onclick="logout()">Salir</button>
@@ -530,7 +597,7 @@
             </div>
           </div>
           <table>
-            <thead><tr><th>Nombre</th><th>DNI</th><th>Rol</th><th>Acceso</th><th>Estado</th><th></th></tr></thead>
+            <thead><tr><th>Nombre</th><th>DNI</th><th>Rol</th><th>Disciplina</th><th>Acceso</th><th>Estado</th><th></th></tr></thead>
             <tbody id="usuarios-tbody">
               <tr><td colspan="5" style="text-align:center;color:#888;padding:20px;">Cargando...</td></tr>
             </tbody>
@@ -562,6 +629,15 @@
         <label>Rol</label>
         <input type="text" id="us-rol" list="roles-list" placeholder="Elegir o escribir un rol nuevo...">
         <datalist id="roles-list"></datalist>
+      </div>
+      <div class="form-group">
+        <label>Disciplina</label>
+        <select id="us-disciplina">
+          <option value="Mecanico">Mecánica</option>
+          <option value="Electrico">Electrónica</option>
+          <option value="Ambas">Ambas</option>
+        </select>
+        <div style="font-size:12px;color:#888;margin-top:4px;">Define que ve al entrar. Con "Ambas" arranca viendo todo.</div>
       </div>
       <div class="form-group">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
@@ -623,6 +699,42 @@
           <option>Anual</option>
         </select>
       </div>
+      <details id="eq-electronica" style="margin-top:4px;">
+        <summary style="cursor:pointer;font-size:13px;font-weight:700;color:#0f3460;margin-bottom:10px;">Datos de electrónica (PLC / HMI / documentación)</summary>
+        <div style="display:flex;gap:10px;">
+          <div class="form-group" style="flex:1;">
+            <label>Familia PLC</label>
+            <select id="eq-plc">
+              <option value="">Sin dato</option>
+              <option>S5</option>
+              <option>S7-200</option>
+              <option>S7-300</option>
+              <option>S7-400</option>
+              <option>S7-1200</option>
+              <option>S7-1500</option>
+              <option>Otro</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label>Modelo HMI</label>
+            <input type="text" id="eq-hmi" placeholder="Ej: KTP700">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Estado tecnológico HMI</label>
+          <select id="eq-hmi-estado">
+            <option value="">Sin dato</option>
+            <option>Vigente</option>
+            <option>Obsoleto</option>
+            <option>Pendiente de actualizacion</option>
+            <option>Desconocido</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>URL de documentación (opcional)</label>
+          <input type="url" id="eq-doc-url" placeholder="https://...">
+        </div>
+      </details>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="cerrarModalEquipo()">Cancelar</button>
@@ -704,6 +816,13 @@
         <select id="ta-maquina"></select>
       </div>
       <div class="form-group">
+        <label>Disciplina</label>
+        <select id="ta-disciplina">
+          <option value="Mecanico">Mecánica</option>
+          <option value="Electrico">Electrónica</option>
+        </select>
+      </div>
+      <div class="form-group">
         <label>Nombre de la tarea</label>
         <input type="text" id="ta-nombre" placeholder="Ej: Inspeccion y limpieza Gral. Tableros">
       </div>
@@ -757,14 +876,23 @@
           <option value="">Seleccionar maquina...</option>
         </select>
       </div>
-      <div class="form-group">
-        <label>Tipo de mantenimiento</label>
-        <select id="reg-tipo" onchange="regToggleTareas()">
-          <option>Preventivo</option>
-          <option>Correctivo</option>
-          <option>Predictivo</option>
-          <option>Emergencia</option>
-        </select>
+      <div style="display:flex;gap:10px;">
+        <div class="form-group" style="flex:1;">
+          <label>Tipo de mantenimiento</label>
+          <select id="reg-tipo" onchange="regToggleTareas()">
+            <option>Preventivo</option>
+            <option>Correctivo</option>
+            <option>Predictivo</option>
+            <option>Emergencia</option>
+          </select>
+        </div>
+        <div class="form-group" style="flex:1;">
+          <label>Disciplina</label>
+          <select id="reg-disciplina" onchange="regCargarTareas()">
+            <option value="Mecanico">Mecánica</option>
+            <option value="Electrico">Electrónica</option>
+          </select>
+        </div>
       </div>
       <div class="form-group">
         <label>Tecnico responsable</label>
@@ -837,9 +965,18 @@
         <label>Maquina</label>
         <select id="mant-maquina" onchange="mantMaquinaCambio()"><option value="">Seleccionar maquina...</option></select>
       </div>
-      <div class="form-group">
-        <label>Titulo</label>
-        <input type="text" id="mant-titulo" placeholder="Ej: Mantenimiento VE serie 989">
+      <div style="display:flex;gap:10px;">
+        <div class="form-group" style="flex:2;">
+          <label>Titulo</label>
+          <input type="text" id="mant-titulo" placeholder="Ej: Mantenimiento VE serie 989">
+        </div>
+        <div class="form-group" style="flex:1;">
+          <label>Disciplina</label>
+          <select id="mant-disciplina">
+            <option value="Mecanico">Mecánica</option>
+            <option value="Electrico">Electrónica</option>
+          </select>
+        </div>
       </div>
       <div style="display:flex;gap:10px;">
         <div class="form-group" style="flex:1;">
@@ -998,6 +1135,63 @@ async function api(path, opts = {}) {
   return res.json();
 }
 
+// =========== Disciplina (Mecanica / Electronica / Todas) ===========
+// La app muestra todo, seccionado por disciplina. El filtro arranca en la
+// disciplina del usuario logueado ('Ambas' o sin dato = Todas) y se recuerda.
+const DISC_LABEL = { Mecanico: 'Mecánica', Electrico: 'Electrónica', Ambas: 'Ambas', '': 'Todas' };
+const DISC_VALIDAS = ['Mecanico', 'Electrico'];
+let discActual = '';
+
+function discBadge(d, extraStyle = '') {
+  if (!DISC_VALIDAS.includes(d)) return '';
+  return `<span class="badge ${d === 'Electrico' ? 'badge-disc-ele' : 'badge-disc-mec'}" style="${extraStyle}">${DISC_LABEL[d]}</span>`;
+}
+
+// Disciplina por defecto para formularios nuevos: la del filtro, o la del usuario, o Mecanico
+function discDefault() {
+  if (DISC_VALIDAS.includes(discActual)) return discActual;
+  if (DISC_VALIDAS.includes(currentUser?.disciplina)) return currentUser.disciplina;
+  return 'Mecanico';
+}
+
+// Query string del filtro activo ('' = todas -> sin parametro, asi la API devuelve todo)
+function discQS(sep = '?') {
+  return discActual ? `${sep}disciplina=${discActual}` : '';
+}
+
+function initDisciplina() {
+  const guardada = localStorage.getItem('cmms_disc');
+  if (guardada !== null && (guardada === '' || DISC_VALIDAS.includes(guardada))) discActual = guardada;
+  else discActual = DISC_VALIDAS.includes(currentUser?.disciplina) ? currentUser.disciplina : '';
+  renderDiscSwitch();
+  document.getElementById('rep-filtro-disc').value = discActual;
+}
+
+function renderDiscSwitch() {
+  document.querySelectorAll('#disc-switch button').forEach(b => b.classList.toggle('active', b.dataset.d === discActual));
+}
+
+function setDisciplina(d) {
+  discActual = DISC_VALIDAS.includes(d) ? d : '';
+  localStorage.setItem('cmms_disc', discActual);
+  renderDiscSwitch();
+  document.getElementById('rep-filtro-disc').value = discActual; // el filtro de repuestos sigue al selector global
+  const activa = document.querySelector('.page.active');
+  const page = activa ? activa.id.replace('page-', '') : 'dashboard';
+  if (pageLoaders[page]) pageLoaders[page]();
+  refreshBadges();
+}
+
+// Menu lateral en mobile (drawer)
+function toggleMenu() {
+  const abierto = document.querySelector('.sidebar').classList.toggle('open');
+  document.getElementById('sidebar-backdrop').classList.toggle('show', abierto);
+}
+function cerrarMenu() {
+  document.querySelector('.sidebar').classList.remove('open');
+  document.getElementById('sidebar-backdrop').classList.remove('show');
+}
+
 // Notificaciones no bloqueantes (reemplazan a los alert del prototipo)
 function toast(msg, tipo = 'error') {
   let cont = document.getElementById('toast-cont');
@@ -1011,7 +1205,7 @@ function toast(msg, tipo = 'error') {
 
 // Badges vivos del sidebar (tareas vencidas / mantenimientos pendientes)
 async function refreshBadges() {
-  const s = await api('/dashboard/stats');
+  const s = await api('/dashboard/stats' + discQS());
   if (!s) return;
   const bt = document.getElementById('badge-tareas');
   bt.textContent = s.tareas_vencidas;
@@ -1044,16 +1238,18 @@ async function doLogin() {
   currentPin = pin;
   localStorage.setItem('cmms_user', JSON.stringify(currentUser));
   localStorage.setItem('cmms_pin', pin);
+  localStorage.removeItem('cmms_disc'); // al loguear arranca en la disciplina del usuario
   document.getElementById('login-overlay').classList.remove('show');
   document.getElementById('topbar-user').textContent = currentUser.nombre;
   document.getElementById('topbar-avatar').textContent = currentUser.nombre.slice(0, 2).toUpperCase();
   aplicarPermisosUI();
+  initDisciplina();
   loadDashboard();
 }
 
 function logout() {
   currentUser = null; currentPin = '';
-  localStorage.removeItem('cmms_user'); localStorage.removeItem('cmms_pin');
+  localStorage.removeItem('cmms_user'); localStorage.removeItem('cmms_pin'); localStorage.removeItem('cmms_disc');
   document.getElementById('login-overlay').classList.add('show');
 }
 
@@ -1063,6 +1259,7 @@ if (currentUser) {
   document.getElementById('topbar-user').textContent = currentUser.nombre;
   document.getElementById('topbar-avatar').textContent = currentUser.nombre.slice(0, 2).toUpperCase();
   aplicarPermisosUI();
+  initDisciplina();
   loadDashboard();
 }
 
@@ -1078,6 +1275,7 @@ document.getElementById('login-pin').addEventListener('keydown', e => { if (e.ke
 const pageLoaders = { dashboard: loadDashboard, equipos: loadEquipos, mantenimientos: loadMantenimientos, ordenes: loadRegistros, calendario: loadCalendario, tareas: loadTareas, repuestos: loadRepuestos, usuarios: loadUsuarios, auditoria: loadAuditoria };
 
 function showPage(page, el) {
+  cerrarMenu();
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.sidebar a').forEach(a => a.classList.remove('active'));
   document.getElementById('page-' + page).classList.add('active');
@@ -1127,7 +1325,7 @@ async function loadAuditoria() {
 // Dashboard
 async function loadDashboard() {
   const [stats, alertas, actividad, registros] = await Promise.all([
-    api('/dashboard/stats'), api('/dashboard/alertas'), api('/dashboard/actividad'), api('/registros')
+    api('/dashboard/stats' + discQS()), api('/dashboard/alertas' + discQS()), api('/dashboard/actividad' + discQS()), api('/registros' + discQS())
   ]);
   if (!stats) return;
 
@@ -1189,7 +1387,7 @@ async function loadEquipos() {
     const proxStyle = m.estado === 'Mant. vencido' ? 'color:#dc3545;font-weight:600;' : '';
     const fmtDate = d => d ? d.split(' ')[0].split('-').reverse().join('/') : '-';
     return `<tr>
-      <td><strong>${m.nombre}</strong><br><span style="font-size:12px;color:#888;">${m.id}</span></td>
+      <td><strong>${m.nombre}</strong><br><span style="font-size:12px;color:#888;">${m.id}</span>${m.plc ? ` <span class="badge badge-disc-ele" style="font-size:11px;">PLC ${m.plc}</span>` : ''}${m.doc_url ? ` <a href="${m.doc_url}" target="_blank" rel="noopener" style="font-size:11px;color:#0f3460;">doc ↗</a>` : ''}</td>
       <td><div class="comp-list-inline">${shown}${extra}</div></td>
       <td>${m.ubicacion}</td>
       <td><span class="badge ${badgeClass}">${m.estado}</span></td>
@@ -1274,7 +1472,7 @@ async function eliminarMaquina(id) {
 // Registros
 let registrosAll = [];
 async function loadRegistros() {
-  const registros = await api('/registros');
+  const registros = await api('/registros' + discQS());
   if (!registros) return;
   registrosAll = registros;
   const tbody = document.getElementById('registros-tbody');
@@ -1289,7 +1487,7 @@ async function loadRegistros() {
     return `<tr>
       <td><strong>${fecha}</strong><br><span style="color:#888;font-size:12px;">${hora}</span></td>
       <td>${r.maquina_nombre}</td>
-      <td><span class="badge ${tipoBadge}">${r.tipo}</span></td>
+      <td><span class="badge ${tipoBadge}">${r.tipo}</span> ${discBadge(r.disciplina)}</td>
       <td><div class="comp-list-inline">${comps}</div></td>
       <td><span class="badge badge-gray">${repCount} items</span></td>
       <td>${r.tecnico_nombre}</td>
@@ -1322,7 +1520,7 @@ function renderChartMeses(registros) {
 let calFecha = new Date();
 
 async function loadCalendario() {
-  const [registros, maquinas] = await Promise.all([api('/registros'), api('/maquinas')]);
+  const [registros, maquinas] = await Promise.all([api('/registros' + discQS()), api('/maquinas')]);
   if (!registros) return;
 
   // eventos: {'YYYY-MM-DD': [{label, clase}]}
@@ -1569,6 +1767,7 @@ function verDetalleRegistro(id) {
   document.getElementById('detalle-body').innerHTML = `
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
       <span class="badge ${tipoBadge}">${r.tipo}</span>
+      ${discBadge(r.disciplina)}
       <span style="font-size:13px;color:#555;">${fecha}</span>
       <span style="font-size:13px;color:#888;">Tecnico: <strong>${r.tecnico_nombre}</strong> · Registro: ${r.registrado_por_nombre}</span>
     </div>
@@ -1599,7 +1798,7 @@ let mantsAll = [], mantMaquinas = [], mantUsuarios = [], mantSugeridas = [], man
 
 async function loadMantenimientos() {
   const [mants, maquinas, usuarios, sugeridas] = await Promise.all([
-    api('/mantenimientos'), api('/maquinas'), api('/usuarios'), api('/tareas-sugeridas')
+    api('/mantenimientos' + discQS()), api('/maquinas'), api('/usuarios'), api('/tareas-sugeridas' + discQS())
   ]);
   if (!mants) return;
   mantsAll = mants;
@@ -1633,7 +1832,7 @@ function renderMantenimientos() {
   }
   const fmtDate = d => d ? d.split(' ')[0].split('-').reverse().join('/') : '-';
   tbody.innerHTML = items.map(m => `<tr>
-    <td><strong>${m.titulo}</strong>${m.horas_marcha ? `<div style="font-size:12px;color:#888;">Horas: ${m.horas_marcha}${m.horas_turbinas ? ' · Turbinas: ' + m.horas_turbinas : ''}</div>` : ''}</td>
+    <td><strong>${m.titulo}</strong> ${discBadge(m.disciplina, 'font-size:11px;')}${m.horas_marcha ? `<div style="font-size:12px;color:#888;">Horas: ${m.horas_marcha}${m.horas_turbinas ? ' · Turbinas: ' + m.horas_turbinas : ''}</div>` : ''}</td>
     <td style="white-space:nowrap;">${m.maquina_id}</td>
     <td style="text-align:center;">${(m.items || []).length}</td>
     <td><span class="badge ${m.estado === 'Pendiente' ? 'badge-yellow' : 'badge-green'}">${m.estado}</span></td>
@@ -1676,6 +1875,9 @@ function abrirModalMant(id) {
   document.getElementById('modal-mant-title').textContent = m ? 'Editar Mantenimiento' : 'Nuevo Mantenimiento';
   document.getElementById('btn-guardar-mant').textContent = m ? 'Guardar cambios' : 'Crear Mantenimiento';
   document.getElementById('mant-titulo').value = m?.titulo || '';
+  const selDisc = document.getElementById('mant-disciplina');
+  selDisc.value = m ? (DISC_VALIDAS.includes(m.disciplina) ? m.disciplina : 'Mecanico') : discDefault();
+  selDisc.disabled = !!m; // la disciplina no se cambia al editar
   document.getElementById('mant-horas').value = m?.horas_marcha || '';
   document.getElementById('mant-horasturb').value = m?.horas_turbinas || '';
 
@@ -1826,6 +2028,7 @@ async function guardarMantenimiento() {
     if (!nuevos.length) { toast('Agregue al menos una fila'); return; }
     res = await api('/mantenimientos', { method: 'POST', body: JSON.stringify({
       maquina_id: maquinaId, titulo,
+      disciplina: document.getElementById('mant-disciplina').value,
       horas_marcha: document.getElementById('mant-horas').value.trim() || null,
       horas_turbinas: document.getElementById('mant-horasturb').value.trim() || null,
       items: nuevos
@@ -1863,14 +2066,14 @@ function imprimirMantenimiento(id) {
     td:nth-child(3) { width: 22%; } td:nth-child(4) { width: 12%; } td:nth-child(5) { width: 10%; }
     tr { height: 28px; }
   </style></head><body>
-    <h1>Mantenimiento preventivo — ${maq ? maq.nombre : m.maquina_id}</h1>
+    <h1>Mantenimiento preventivo ${DISC_LABEL[m.disciplina] ? '(' + DISC_LABEL[m.disciplina] + ') ' : ''}— ${maq ? maq.nombre : m.maquina_id}</h1>
     <div class="sub">
       <span>${m.titulo}</span>
       <span>Cantidad de horas de marcha: ${m.horas_marcha || '________'}</span>
       <span>Horas de marcha turbinas: ${m.horas_turbinas || '________'}</span>
     </div>
     <table>
-      <thead><tr><th>Mantenimiento preventivo</th><th>Tarea</th><th>Novedades</th><th>Mecanico</th><th>Fecha</th></tr></thead>
+      <thead><tr><th>Mantenimiento preventivo</th><th>Tarea</th><th>Novedades</th><th>${m.disciplina === 'Electrico' ? 'Tecnico' : 'Mecanico'}</th><th>Fecha</th></tr></thead>
       <tbody>${filas}</tbody>
     </table>
     <script>window.onload = () => window.print();<\/script>
@@ -1897,7 +2100,7 @@ function abrirModalMantComp(id) {
       <div class="tarea-desc">${it.tarea}</div>
       <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
         <select class="mant-it-mecanico" style="flex:1;min-width:150px;">
-          <option value="">Mecanico...</option>${opciones.replace(`value="${it.mecanico_id || ''}"`, `value="${it.mecanico_id || ''}" selected`)}
+          <option value="">${m.disciplina === 'Electrico' ? 'Tecnico' : 'Mecanico'}...</option>${opciones.replace(`value="${it.mecanico_id || ''}"`, `value="${it.mecanico_id || ''}" selected`)}
         </select>
         <input type="text" class="mant-it-novedades" placeholder="Novedades (opcional)" value="${it.novedades || ''}" style="flex:2;min-width:180px;">
         <input type="date" class="mant-it-fecha" value="${it.fecha ? it.fecha.slice(0, 10) : hoy}" style="flex:0 0 140px;">
@@ -1954,7 +2157,7 @@ let tareasAll = [], tareaMaquinas = [], tareaUsuarios = [], tareaEditandoId = nu
 
 async function loadTareas() {
   const [tareas, maquinas, usuarios] = await Promise.all([
-    api('/tareas'), api('/maquinas'), api('/usuarios')
+    api('/tareas' + discQS()), api('/maquinas'), api('/usuarios')
   ]);
   if (!tareas) return;
   tareasAll = tareas;
@@ -1999,7 +2202,7 @@ function renderTareas() {
   }
   tbody.innerHTML = items.map(t => `<tr style="${t.activa ? '' : 'opacity:.5;'}">
     <td style="text-align:center;color:#888;">${t.orden}</td>
-    <td><strong>${t.nombre}</strong>${t.descripcion ? `<div style="font-size:12px;color:#888;">${t.descripcion}</div>` : ''}</td>
+    <td><strong>${t.nombre}</strong> ${discBadge(t.disciplina, 'font-size:11px;')}${t.descripcion ? `<div style="font-size:12px;color:#888;">${t.descripcion}</div>` : ''}</td>
     <td style="white-space:nowrap;">${t.maquina_id}</td>
     <td>${t.frecuencia}</td>
     <td style="text-align:right;color:#888;">${t.tiempo_estimado_min ? t.tiempo_estimado_min + ' min' : '-'}</td>
@@ -2029,6 +2232,7 @@ function abrirModalTarea(id) {
   selAsig.innerHTML = '<option value="">Sin asignar</option>' +
     tareaUsuarios.filter(u => u.estado === 'Activo').map(u => `<option value="${u.id}">${u.nombre} (${u.rol})</option>`).join('');
 
+  document.getElementById('ta-disciplina').value = t ? (DISC_VALIDAS.includes(t.disciplina) ? t.disciplina : 'Mecanico') : discDefault();
   document.getElementById('ta-nombre').value = t?.nombre || '';
   document.getElementById('ta-descripcion').value = t?.descripcion || '';
   document.getElementById('ta-tiempo').value = t?.tiempo_estimado_min ?? '';
@@ -2045,6 +2249,7 @@ async function guardarTarea() {
   const tiempo = parseInt(document.getElementById('ta-tiempo').value);
   const data = {
     nombre,
+    disciplina: document.getElementById('ta-disciplina').value,
     descripcion: document.getElementById('ta-descripcion').value.trim() || null,
     tiempo_estimado_min: isNaN(tiempo) ? null : tiempo,
     frecuencia: document.getElementById('ta-frecuencia').value,
@@ -2088,10 +2293,12 @@ async function loadUsuarios() {
     const acceso = u.puede_ingresar
       ? '<span class="badge badge-green">Con acceso</span>'
       : '<span class="badge badge-gray">Solo registro</span>';
+    const disc = u.disciplina === 'Ambas' ? '<span class="badge badge-gray">Ambas</span>' : (discBadge(u.disciplina) || '<span style="color:#bbb;">-</span>');
     return `<tr>
       <td><strong>${u.nombre}</strong></td>
       <td>${u.id}</td>
       <td><span class="badge ${rolClass}" ${u.rol === 'Administrador' ? 'style="background:#0f3460;color:white;"' : ''}>${u.rol}</span></td>
+      <td>${disc}</td>
       <td>${acceso}</td>
       <td><span class="badge ${u.estado === 'Activo' ? 'badge-green' : 'badge-red'}">${u.estado}</span></td>
       <td>${esAdmin ? `<button class="btn btn-outline btn-sm" onclick="abrirModalUsuario('${u.id}')">Editar</button>` : ''}</td>
@@ -2112,6 +2319,7 @@ function abrirModalUsuario(id) {
   dniInput.readOnly = !!u;
   dniInput.style.background = u ? '#f1f5f9' : '';
   document.getElementById('us-rol').value = u?.rol || '';
+  document.getElementById('us-disciplina').value = u?.disciplina || discDefault();
   document.getElementById('us-acceso').checked = !!u?.puede_ingresar;
   const pinInput = document.getElementById('us-pin');
   pinInput.value = u ? '' : '000000';
@@ -2139,6 +2347,7 @@ async function guardarUsuario() {
   const rol = document.getElementById('us-rol').value.trim();
   const acceso = document.getElementById('us-acceso').checked;
   const pin = document.getElementById('us-pin').value.trim();
+  const disciplina = document.getElementById('us-disciplina').value;
   if (!nombre || !dni || !rol) { toast('Complete nombre, DNI y rol'); return; }
 
   let res;
@@ -2147,6 +2356,7 @@ async function guardarUsuario() {
     const data = {};
     if (nombre !== u.nombre) data.nombre = nombre;
     if (rol !== u.rol) data.rol = rol;
+    if (disciplina !== (u.disciplina || 'Mecanico')) data.disciplina = disciplina;
     if (acceso !== u.puede_ingresar) data.puede_ingresar = acceso;
     if (pin) data.pin = pin; // vacio = no cambiar
     const estado = document.getElementById('us-estado').value;
@@ -2157,7 +2367,7 @@ async function guardarUsuario() {
   } else {
     if (acceso && !pin) { toast('Un usuario con acceso necesita PIN'); return; }
     res = await api('/usuarios', { method: 'POST', body: JSON.stringify({
-      id: dni, nombre, rol, pin: acceso ? pin : '', puede_ingresar: acceso
+      id: dni, nombre, rol, disciplina, pin: acceso ? pin : '', puede_ingresar: acceso
     })});
   }
 
@@ -2177,8 +2387,9 @@ function abrirModalEquipo() {
   document.getElementById('btn-guardar-equipo').textContent = 'Guardar y generar QR';
   document.getElementById('eq-id').readOnly = false;
   document.getElementById('eq-id').style.background = '';
-  ['eq-id','eq-nombre','eq-ubicacion','eq-componentes'].forEach(id => document.getElementById(id).value = '');
+  ['eq-id','eq-nombre','eq-ubicacion','eq-componentes','eq-plc','eq-hmi','eq-hmi-estado','eq-doc-url'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('eq-frecuencia').value = 'Trimestral';
+  document.getElementById('eq-electronica').open = discActual === 'Electrico';
   document.getElementById('modal-equipo').classList.add('show');
 }
 
@@ -2193,6 +2404,11 @@ function editarMaquina(m) {
   document.getElementById('eq-ubicacion').value = m.ubicacion;
   document.getElementById('eq-componentes').value = (m.componentes || []).map(c => c.nombre).join(', ');
   document.getElementById('eq-frecuencia').value = m.frecuencia_mantenimiento || 'Trimestral';
+  document.getElementById('eq-plc').value = m.plc || '';
+  document.getElementById('eq-hmi').value = m.hmi || '';
+  document.getElementById('eq-hmi-estado').value = m.hmi_estado || '';
+  document.getElementById('eq-doc-url').value = m.doc_url || '';
+  document.getElementById('eq-electronica').open = !!(m.plc || m.hmi || m.hmi_estado || m.doc_url || discActual === 'Electrico');
   document.getElementById('modal-equipo').classList.add('show');
 }
 
@@ -2208,10 +2424,18 @@ async function guardarMaquina() {
   const frecuencia = document.getElementById('eq-frecuencia').value;
 
   if (!nombre || !ubicacion) { toast('Complete los campos obligatorios'); return; }
+  const docUrl = document.getElementById('eq-doc-url').value.trim();
+  if (docUrl && !/^https?:\/\//i.test(docUrl)) { toast('La URL de documentacion debe empezar con http:// o https://'); return; }
+  const electronica = {
+    plc: document.getElementById('eq-plc').value || null,
+    hmi: document.getElementById('eq-hmi').value.trim() || null,
+    hmi_estado: document.getElementById('eq-hmi-estado').value || null,
+    doc_url: docUrl || null
+  };
 
   if (editandoMaquinaId) {
     // Editar existente
-    const data = { nombre, ubicacion, frecuencia_mantenimiento: frecuencia, componentes: comps };
+    const data = { nombre, ubicacion, frecuencia_mantenimiento: frecuencia, componentes: comps, ...electronica };
     const res = await api('/maquinas/' + editandoMaquinaId, { method: 'PUT', body: JSON.stringify(data) });
     if (res && !res.error) {
       cerrarModalEquipo();
@@ -2221,7 +2445,7 @@ async function guardarMaquina() {
     // Crear nueva
     const id = document.getElementById('eq-id').value.trim();
     if (!id) { toast('Complete el Codigo / ID'); return; }
-    const data = { id, nombre, ubicacion, frecuencia_mantenimiento: frecuencia, componentes: comps };
+    const data = { id, nombre, ubicacion, frecuencia_mantenimiento: frecuencia, componentes: comps, ...electronica };
     const res = await api('/maquinas', { method: 'POST', body: JSON.stringify(data) });
     if (res && !res.error) {
       cerrarModalEquipo();
@@ -2295,6 +2519,7 @@ async function abrirModalRegistro() {
   document.getElementById('reg-componentes-list').innerHTML = '';
   document.getElementById('reg-observaciones').value = '';
   document.getElementById('reg-proximo').value = '';
+  document.getElementById('reg-disciplina').value = discDefault();
 
   const [maquinas, usuarios, repuestos] = await Promise.all([
     api('/maquinas'), api('/usuarios'), api('/repuestos')
@@ -2338,7 +2563,7 @@ async function crearPersonaInline() {
   const dni = document.getElementById('np-dni').value.trim();
   const rol = document.getElementById('np-rol').value.trim();
   if (!nombre || !dni || !rol) { toast('Complete nombre, DNI y rol'); return; }
-  const res = await api('/usuarios', { method: 'POST', body: JSON.stringify({ id: dni, nombre, rol, puede_ingresar: false }) });
+  const res = await api('/usuarios', { method: 'POST', body: JSON.stringify({ id: dni, nombre, rol, disciplina: document.getElementById('reg-disciplina').value, puede_ingresar: false }) });
   if (!res || res.error) { toast(res?.error || 'Error al crear persona'); return; }
   const usuarios = await api('/usuarios');
   poblarTecnicos(usuarios || [], dni);
@@ -2363,7 +2588,8 @@ const REG_TAREA_BADGES = { vencida: 'Vencida', nunca: 'Nunca hecha', proxima: 'P
 
 async function regCargarTareas() {
   const maqId = document.getElementById('reg-maquina').value;
-  regTareas = maqId ? (await api('/maquinas/' + encodeURIComponent(maqId) + '/tareas')) || [] : [];
+  const disc = document.getElementById('reg-disciplina').value;
+  regTareas = maqId ? (await api('/maquinas/' + encodeURIComponent(maqId) + '/tareas?disciplina=' + disc)) || [] : [];
   regRenderTareas();
   regToggleTareas();
 }
@@ -2628,6 +2854,7 @@ async function guardarRegistro() {
     maquina_id: maquinaId,
     fecha,
     tipo,
+    disciplina: document.getElementById('reg-disciplina').value,
     tecnico_id: tecnicoId,
     registrado_por_id: currentUser.id,
     proximo_mantenimiento: document.getElementById('reg-proximo').value || null,
@@ -2763,6 +2990,11 @@ function descargarQR() {
   link.download = `QR-${qrMaquinaActual.id}.png`;
   link.href = canvas.toDataURL('image/png');
   link.click();
+}
+
+// PWA: service worker (solo cuando lo sirve el backend; el server de tests no lo tiene)
+if ('serviceWorker' in navigator && location.port !== '8888') {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
 }
 </script>
 </body>

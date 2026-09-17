@@ -9,6 +9,7 @@ CREATE TABLE Tareas (
     frecuencia          NVARCHAR(20)  NOT NULL DEFAULT 'Mensual'
                         CHECK (frecuencia IN ('Semanal', 'Quincenal', 'Mensual', 'Bimestral',
                                'Trimestral', 'Semestral', 'Anual')),
+    disciplina          NVARCHAR(10)  NOT NULL DEFAULT 'Mecanico' CHECK (disciplina IN ('Mecanico', 'Electrico')),
     asignado_id         NVARCHAR(50)  NULL,
     orden               INT           NOT NULL DEFAULT 0,
     activa              BIT           NOT NULL DEFAULT 1,

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"cmms-backend/db"
 	"cmms-backend/models"
@@ -16,8 +17,17 @@ type DashboardHandler struct {
 	D  db.Dialect
 }
 
+// discFilter arma " AND <col> = ?" + arg cuando viene ?disciplina= valido.
+func (h *DashboardHandler) discFilter(c *gin.Context, col string, argIdx int) (string, []interface{}) {
+	if disc := c.Query("disciplina"); models.DisciplinaValida(disc, false) {
+		return " AND " + col + " = " + h.D.Param(argIdx), []interface{}{disc}
+	}
+	return "", nil
+}
+
 func (h *DashboardHandler) Stats(c *gin.Context) {
 	var stats models.DashboardStats
+	discSQL, discArgs := h.discFilter(c, "disciplina", 1)
 
 	h.DB.QueryRow("SELECT COUNT(*) FROM Maquinas").Scan(&stats.MaquinasActivas)
 
@@ -27,15 +37,15 @@ func (h *DashboardHandler) Stats(c *gin.Context) {
 		h.D.DateAddDays(7), h.D.Now())).Scan(&stats.MantenimientosPendientes)
 	stats.MantenimientosPendientes += stats.MaquinasVencidas
 
-	h.DB.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM Registros WHERE %s", h.D.CurrentYearMonth("fecha"))).Scan(&stats.RegistrosEsteMes)
+	h.DB.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM Registros WHERE %s%s", h.D.CurrentYearMonth("fecha"), discSQL), discArgs...).Scan(&stats.RegistrosEsteMes)
 
 	h.DB.QueryRow("SELECT COUNT(*) FROM Repuestos WHERE stock_actual < stock_minimo").Scan(&stats.RepuestosStockBajo)
 
 	// Tareas vencidas: mismo calculo que la pagina de tareas (frecuencia vs ultima ejecucion)
 	qTareas := fmt.Sprintf(`SELECT t.frecuencia,
 		(SELECT %s FROM Registros r JOIN RegistroTareas rt ON rt.registro_id = r.id WHERE rt.tarea_id = t.id)
-		FROM Tareas t WHERE t.activa = 1`, h.D.DateTimeToStr("MAX(r.fecha)"))
-	if rows, err := h.DB.Query(qTareas); err == nil {
+		FROM Tareas t WHERE t.activa = 1%s`, h.D.DateTimeToStr("MAX(r.fecha)"), strings.Replace(discSQL, "disciplina", "t.disciplina", 1))
+	if rows, err := h.DB.Query(qTareas, discArgs...); err == nil {
 		for rows.Next() {
 			var t models.Tarea
 			if rows.Scan(&t.Frecuencia, &t.UltimaEjecucion) != nil {
@@ -49,7 +59,7 @@ func (h *DashboardHandler) Stats(c *gin.Context) {
 		rows.Close()
 	}
 
-	h.DB.QueryRow("SELECT COUNT(*) FROM Mantenimientos WHERE estado = 'Pendiente'").Scan(&stats.MantsPlanPendientes)
+	h.DB.QueryRow("SELECT COUNT(*) FROM Mantenimientos WHERE estado = 'Pendiente'"+discSQL, discArgs...).Scan(&stats.MantsPlanPendientes)
 
 	c.JSON(http.StatusOK, stats)
 }
@@ -93,6 +103,7 @@ func (h *DashboardHandler) Alertas(c *gin.Context) {
 }
 
 func (h *DashboardHandler) Actividad(c *gin.Context) {
+	discSQL, discArgs := h.discFilter(c, "r.disciplina", 1)
 	query := fmt.Sprintf(`SELECT %sr.id,
 		%s, m.nombre, r.tipo, t.nombre,
 		(SELECT COUNT(*) FROM RegistroComponentes WHERE registro_id = r.id),
@@ -100,15 +111,17 @@ func (h *DashboardHandler) Actividad(c *gin.Context) {
 		FROM Registros r
 		JOIN Maquinas m ON r.maquina_id = m.id
 		JOIN Usuarios t ON r.tecnico_id = t.id
+		WHERE 1=1%s
 		ORDER BY r.fecha DESC%s`,
 		h.D.Top(10),
 		h.D.DateTimeToStr("r.fecha"),
 		h.D.Coalesce(
 			"(SELECT SUM(rr.cantidad) FROM RegistroRepuestos rr JOIN RegistroComponentes rc ON rr.registro_componente_id = rc.id WHERE rc.registro_id = r.id)",
 			"0"),
+		discSQL,
 		h.D.Limit(10))
 
-	rows, err := h.DB.Query(query)
+	rows, err := h.DB.Query(query, discArgs...)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al obtener actividad"})
 		return
