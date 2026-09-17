@@ -53,9 +53,17 @@ func main() {
 	r.Use(middleware.CORS(cfg.CORSOrigin))
 
 	// Serve static frontend files
-	r.StaticFile("/", "./static/backoffice.html")
-	r.StaticFile("/backoffice.html", "./static/backoffice.html")
-	r.StaticFile("/qr.html", "./static/qr.html")
+	// HTML con no-cache: el navegador revalida en cada carga (304 si no cambio)
+	// y los deploys se ven al toque en vez de quedar el HTML viejo cacheado.
+	html := func(path string) gin.HandlerFunc {
+		return func(c *gin.Context) {
+			c.Header("Cache-Control", "no-cache")
+			c.File(path)
+		}
+	}
+	r.GET("/", html("./static/backoffice.html"))
+	r.GET("/backoffice.html", html("./static/backoffice.html"))
+	r.GET("/qr.html", html("./static/qr.html"))
 
 	// PWA: manifest, service worker e iconos (archivos en static/)
 	r.GET("/manifest.webmanifest", func(c *gin.Context) {
@@ -145,7 +153,6 @@ func main() {
 		api.GET("/registros/:id", registroH.Get)
 		api.POST("/registros", registroH.Create)
 		api.DELETE("/registros/:id", middleware.RequireRole("Administrador"), registroH.Delete)
-
 
 		// Usuarios
 		api.GET("/usuarios", usuarioH.List)
