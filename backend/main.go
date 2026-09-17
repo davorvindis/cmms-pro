@@ -61,9 +61,10 @@ func main() {
 			c.File(path)
 		}
 	}
-	r.GET("/", html("./static/backoffice.html"))
-	r.GET("/backoffice.html", html("./static/backoffice.html"))
-	r.GET("/qr.html", html("./static/qr.html"))
+	for path, file := range map[string]string{"/": "./static/backoffice.html", "/backoffice.html": "./static/backoffice.html", "/qr.html": "./static/qr.html"} {
+		r.GET(path, html(file))
+		r.HEAD(path, html(file))
+	}
 
 	// PWA: manifest, service worker e iconos (archivos en static/)
 	r.GET("/manifest.webmanifest", func(c *gin.Context) {
