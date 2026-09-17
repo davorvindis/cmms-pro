@@ -10,4 +10,4 @@
 - Usuario quiere avisos proactivos del progreso de tareas largas ("me vas a avisar o como es?") — reportar al terminar sin que pregunte.
 - **Layout mobile en flex**: `.main { flex:1 }` dentro de `.layout { display:flex }` tiene `min-width:auto` → cualquier hijo `nowrap` (topbar) ensancha la página entera y corre los `position:fixed`. Siempre `min-width:0` en el flex item principal + `overflow-x:hidden` en body para ≤900px. Verificar con captura real a 390px, no solo con tests.
 - **Smoke con curl desde zsh**: `$H` con varios `-H` NO se divide en palabras en zsh; usar array bash (`A=(-H ...); "${A[@]}"`) o `bash script.sh`.
-
+- **Leer el log de arranque en prod después de CADA deploy** (no solo /health): el backfill de PINs falló 1 mes sin que nadie lo viera porque el error solo estaba en el log. Un "verificado en prod" sin log no es verificación.

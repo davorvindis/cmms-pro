@@ -29,7 +29,8 @@
 - PWA: `manifest.webmanifest` + `sw.js` (estáticos network-first con fallback cache, API nunca cacheada) + íconos en `backend/static/`, rutas en main.go. Layout mobile: sidebar → drawer con hamburguesa, stats 2 col, tablas con scroll, modales a pantalla. Verificado con capturas reales a 390px.
 - Tests: +7 backoffice (disciplina, campos electrónica, drawer) +7 consistencia (selects, PWA). Suite: 146 pass / 50 viejos de qr.spec (pre-existentes).
 - Fase 2 anotada en todo.md: minutas, 2 responsables + continuidad entre turnos, sugerencias de mejora, importar lo que Gastón cargó en Supabase.
+- Deploy v15 OK. El log de arranque destapó bug previo: `Usuarios.pin` era NVARCHAR(10) en Azure SQL → el backfill bcrypt de v14 fallaba silenciosamente ("would be truncated") y los 5 PINs seguían en texto plano. **v16**: `ensurePinLength` amplía a NVARCHAR(100) antes del backfill. Verificado en prod: "Usuarios.pin ampliado" + "PINs migrados a hash: 5", revisión 0000016 Healthy.
 
 ## Estado
-- Prod: `ca-cmms-prod` imagen **cmms:v14**, DB cmms_db (Azure SQL, PITR 7d), ~USD 22/mes.
+- Prod: `ca-cmms-prod` imagen **cmms:v16**, DB cmms_db (Azure SQL, PITR 7d), ~USD 22/mes. PINs bcrypt reales desde v16.
 - 11 máquinas, 484 tareas, 2.085 repuestos, auditoría activa.

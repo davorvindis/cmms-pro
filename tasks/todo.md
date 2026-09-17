@@ -24,7 +24,7 @@ Vocabulario DB: `Mecanico` | `Electrico` (el que ya usa Repuestos). Usuarios ade
 
 ### Cierre
 - [x] Bitácora + CLAUDE.md + registro-apps (decisión: Supabase de Gastón se apaga cuando electrónica migre)
-- [ ] Deploy v15 + smoke
+- [x] Deploy v15 + smoke (2026-09-17) · v16 fix pin NVARCHAR(100), PINs hasheados en prod
 
 ### Fase 2 (no ahora, vienen de la app de Gastón)
 - [ ] Minutas (pedidos urgentes de Producción a electrónica)
@@ -33,7 +33,7 @@ Vocabulario DB: `Mecanico` | `Electrico` (el que ya usa Repuestos). Usuarios ade
 - [ ] Importar máquinas/plantillas que Gastón ya cargó en Supabase (pedirle export)
 
 ## Pendiente Davor (operativo)
-- [ ] Cambiar PIN de admin (sigue 1234) — urgente, 2 min
+- [ ] Cambiar PIN de admin (sigue 1234) — urgente, 2 min (desde v16 se guarda hasheado)
 - [ ] Piloto real: Maciel/Gonzalo cargan un preventivo escaneando QR
 - [ ] Pasar lista de repuestos eléctricos (hoy todo Mecanico)
 - [ ] Definir si se agrega campo "Estado cuenta horas" a registros
