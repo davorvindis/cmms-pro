@@ -6,7 +6,7 @@ CREATE TABLE Usuarios (
     id             NVARCHAR(50)  PRIMARY KEY,
     nombre         NVARCHAR(100) NOT NULL,
     rol            NVARCHAR(50)  NOT NULL,
-    pin            NVARCHAR(10)  NOT NULL DEFAULT '',
+    pin            NVARCHAR(100) NOT NULL DEFAULT '',  -- hash bcrypt (60 chars)
     puede_ingresar BIT           NOT NULL DEFAULT 1,
     estado         NVARCHAR(10)  NOT NULL DEFAULT 'Activo' CHECK (estado IN ('Activo', 'Inactivo')),
     disciplina     NVARCHAR(10)  NOT NULL DEFAULT 'Mecanico' CHECK (disciplina IN ('Mecanico', 'Electrico', 'Ambas')),

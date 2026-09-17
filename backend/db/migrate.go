@@ -83,7 +83,32 @@ func Migrate(database *sql.DB, dialect Dialect) {
 		"NVARCHAR(100) NULL CHECK (hmi_estado IS NULL OR hmi_estado IN ('Vigente', 'Obsoleto', 'Pendiente de actualizacion', 'Desconocido'))")
 	ensureColumn(database, dialect, "Maquinas", "doc_url", "TEXT", "NVARCHAR(500) NULL")
 
+	// pin guarda hash bcrypt (60 chars): la columna original mssql era
+	// NVARCHAR(10) y el backfill fallaba silenciosamente ("would be truncated").
+	ensurePinLength(database, dialect)
+
 	fmt.Println("Database migration completed")
+}
+
+// ensurePinLength amplia Usuarios.pin en SQL Server si quedo con el largo
+// original (sqlite es TEXT, no aplica). Corre antes de security.BackfillPins.
+func ensurePinLength(database *sql.DB, dialect Dialect) {
+	if dialect.Type == SQLite {
+		return
+	}
+	var maxLen int
+	if err := database.QueryRow("SELECT max_length FROM sys.columns WHERE object_id = OBJECT_ID('Usuarios') AND name = 'pin'").Scan(&maxLen); err != nil {
+		log.Printf("ensurePinLength: check failed: %v", err)
+		return
+	}
+	if maxLen < 0 || maxLen >= 200 { // -1 = MAX; NVARCHAR(100) = 200 bytes
+		return
+	}
+	if _, err := database.Exec("ALTER TABLE Usuarios ALTER COLUMN pin NVARCHAR(100) NOT NULL"); err != nil {
+		log.Printf("ensurePinLength: alter failed: %v", err)
+		return
+	}
+	fmt.Println("Usuarios.pin ampliado a NVARCHAR(100)")
 }
 
 // isAlreadyExists detecta errores benignos de re-ejecucion de DDL.
