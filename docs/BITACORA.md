@@ -31,6 +31,17 @@
 - Fase 2 anotada en todo.md: minutas, 2 responsables + continuidad entre turnos, sugerencias de mejora, importar lo que Gastón cargó en Supabase.
 - Deploy v15 OK. El log de arranque destapó bug previo: `Usuarios.pin` era NVARCHAR(10) en Azure SQL → el backfill bcrypt de v14 fallaba silenciosamente ("would be truncated") y los 5 PINs seguían en texto plano. **v16**: `ensurePinLength` amplía a NVARCHAR(100) antes del backfill. Verificado en prod: "Usuarios.pin ampliado" + "PINs migrados a hash: 5", revisión 0000016 Healthy.
 
+### 2026-09-29 — Hardening integral (v17, **pendiente deploy**)
+Sesión con 3 agentes en paralelo (frontend/Docker, backend Go, tests/CI). Commit `67eabf0`.
+- Seguridad: bloques quick-login DEV envueltos en `<!-- DEV-ONLY-START/END -->`; el Dockerfile los elimina con `sed` al buildear → las credenciales (admin/1234, DNIs PIN 000000) dejan de viajar en el HTML de prod. Siguen en el fuente para tests/localhost.
+- Dockerfile raíz: ahora copia `backend/static/` completo (manifest/sw.js/icons — antes solo los 2 HTML; prod los servía porque la imagen v15+ se buildeó con otro contexto, ahora es reproducible). `.dockerignore` ya no excluye backend/static.
+- Migraciones: tabla `SchemaMigrations` (versión aplicada una sola vez, ambos dialectos); error real aborta el arranque con log claro (antes: `return` silencioso salteaba el resto). Tolerancia "already exists"/"duplicate column" solo para adoptar la DB de prod existente en la primera corrida.
+- Auditoría v2 (migración 005): `AuditLog.ip` + `AuditLog.antes` (estado anterior en PUT/DELETE de máquinas/repuestos/tareas/mantenimientos/usuarios y DELETE registros, vía `setAuditAntes`); logins auditados (`login` / `login_fallido`, con IP, sin pin). GET /api/auditoria devuelve los campos nuevos. Pendiente estándar: fecha sigue hora local del server (no UTC), append-only por convención.
+- Tests: `qr.spec.js` reescrito 0km contra el qr.html actual (65 tests) + 4 asserts viejos corregidos → **suite 194/194 verde** (antes 146/50 rojos permanentes).
+- CI/CD: job `go` (build+vet+test) en tests.yml; `deploy.yml` workflow_dispatch (requiere crear secret `AZURE_CREDENTIALS`, comando sugerido en el YAML).
+- Limpieza: `render.yaml` borrado, README sin nodered, AGENTS.md (local, gitignoreado) reescrito.
+- **Pendiente al cierre**: deploy v17 (`az acr build` + `containerapp update`) y cambio de PIN admin — bloqueados para Claude por permisos de prod, quedan para Davor.
+
 ## Estado
-- Prod: `ca-cmms-prod` imagen **cmms:v16**, DB cmms_db (Azure SQL, PITR 7d), ~USD 22/mes. PINs bcrypt reales desde v16.
-- 11 máquinas, 484 tareas, 2.085 repuestos, auditoría activa.
+- Prod: `ca-cmms-prod` imagen **cmms:v16** (v17 buildeable, pendiente deploy), DB cmms_db (Azure SQL, PITR 7d), ~USD 22/mes. PINs bcrypt reales desde v16.
+- 11 máquinas, 484 tareas, 2.085 repuestos, auditoría activa. Suite Playwright 194/194.

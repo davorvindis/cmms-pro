@@ -33,17 +33,20 @@ Vocabulario DB: `Mecanico` | `Electrico` (el que ya usa Repuestos). Usuarios ade
 - [ ] Importar máquinas/plantillas que Gastón ya cargó en Supabase (pedirle export)
 
 ## Pendiente Davor (operativo)
-- [ ] Cambiar PIN de admin (sigue 1234) — urgente, 2 min (desde v16 se guarda hasheado)
+- [ ] **Deploy v17** (commit 67eabf0, suite 194/194): `az acr build --registry acrespertshared --image cmms:v17 .` + `az containerapp update -n ca-cmms-prod -g rg-maquinas-prod --image acrespertshared.azurecr.io/cmms:v17` — saca las credenciales del HTML de prod y activa auditoría v2
+- [ ] Cambiar PIN de admin (sigue 1234) — urgente, 2 min desde backoffice → Usuarios → admin → editar
 - [ ] Piloto real: Maciel/Gonzalo cargan un preventivo escaneando QR
 - [ ] Pasar lista de repuestos eléctricos (hoy todo Mecanico)
 - [ ] Definir si se agrega campo "Estado cuenta horas" a registros
 
 ## Backlog técnico
-- [ ] Reescribir ~50 tests viejos de qr.spec.js (prototipo pre-backend) → CI verde confiable
+- [x] Reescribir qr.spec.js → 194/194 verde (v17, 2026-09-29)
+- [x] Migraciones versionadas (SchemaMigrations) + auditoría ip/antes/logins (v17)
 - [ ] Repuestos condicionados Protos: agregar campos prioridad/fabricante/ubicación/tiempo reemplazo + cargar hoja "REPUESTOS CONDICIONADOS PROTOS" del Excel de rutinas
 - [ ] Frecuencia "Cuatrimestral" en Tareas (hoy "4 meses" ≈ Trimestral con nota en descripción)
 - [ ] Evaluar minReplicas 0 en ca-cmms-prod (~USD 15/mes de ahorro, cold start 5-10s) — decidir con Producción
-- [ ] CI/CD automático (hoy deploy manual az acr build + containerapp update)
+- [x] CI go build/vet/test + CD scaffold `deploy.yml` (v17) — para usar el CD falta crear secret `AZURE_CREDENTIALS` en el repo (comando sugerido en el YAML)
+- [ ] AuditLog: fecha a UTC (hoy hora local del server) + append-only real (DENY/trigger) — gap vs estándar Espert
 
 ## Hecho (sesiones 2026-08-07 → 08-12)
 - [x] Tareas preventivas + checklist QR multi-tilde (v6)
