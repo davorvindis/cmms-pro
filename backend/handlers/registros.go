@@ -299,6 +299,7 @@ func actualizarEstadoMaquina(tx *sql.Tx, d db.Dialect, maquinaID string) error {
 
 func (h *RegistroHandler) Delete(c *gin.Context) {
 	id := c.Param("id")
+	setAuditAntes(c, h.DB, "SELECT id, maquina_id, fecha, tipo, tecnico_id, registrado_por_id, proximo_mantenimiento, observaciones, disciplina FROM Registros WHERE id = "+h.D.Param(1), id)
 	result, err := h.DB.Exec("DELETE FROM Registros WHERE id = "+h.D.Param(1), id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al eliminar"})

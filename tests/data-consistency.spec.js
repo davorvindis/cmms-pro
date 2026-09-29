@@ -87,9 +87,9 @@ function extractObjectKeys(src, varName) {
 test.describe('Maintenance type options consistency', () => {
   test('backoffice filter select contains the same types as qr reg-tipo select', async () => {
     // In backoffice.html, the filter select for ordenes page does NOT have an id.
-    // The reg-tipo select is only in qr.html; what we compare is the set of
+    // The qr-reg-tipo select is only in qr.html; what we compare is the set of
     // maintenance types to ensure both files know about the same types.
-    const qrTypes = extractSelectOptions(QR_SRC, 'reg-tipo');
+    const qrTypes = extractSelectOptions(QR_SRC, 'qr-reg-tipo');
     expect(qrTypes).toHaveLength(4);
     expect(qrTypes).toEqual(
       expect.arrayContaining(['Correctivo', 'Preventivo', 'Predictivo', 'Emergencia'])
@@ -152,10 +152,13 @@ test.describe('Spare-part category consistency', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('API_BASE consistency', () => {
-  test('both files use the same API_BASE value', () => {
+  test('both files use the same API_BASE expression', () => {
+    // API_BASE ya no es un string literal: es una expresion (mismo origen en
+    // prod, localhost:8080 cuando lo sirve el server de tests en :8888).
+    // Se compara la expresion completa, normalizando espacios.
     const extractApiBase = (src) => {
-      const m = src.match(/const API_BASE\s*=\s*['"]([^'"]+)['"]/);
-      return m ? m[1] : null;
+      const m = src.match(/const API_BASE\s*=\s*([\s\S]*?);\s*\n/);
+      return m ? m[1].replace(/\s+/g, ' ').trim() : null;
     };
     const backBase = extractApiBase(BACKOFFICE_SRC);
     const qrBase = extractApiBase(QR_SRC);
@@ -241,8 +244,11 @@ test.describe('Auth header names consistency', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('QR link format', () => {
-  test('backoffice generates qr.html?maquina= links', () => {
-    expect(BACKOFFICE_SRC).toContain('qr.html?maquina=');
+  test('backoffice generates qr.html links with the maquina param', () => {
+    // El link ya no es un string fijo "qr.html?maquina=": se arma en
+    // getQRUrl() como base (qr.html) + '?maquina=' + id codificado.
+    expect(BACKOFFICE_SRC).toContain('qr.html');
+    expect(BACKOFFICE_SRC).toContain("'?maquina='");
   });
 
   test('qr.html reads the "maquina" URL parameter', () => {

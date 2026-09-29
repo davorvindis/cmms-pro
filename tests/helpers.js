@@ -119,6 +119,12 @@ const FIXTURES = {
     { id: 1, fecha: '2026-08-12 10:00', usuario_id: 'maciel', usuario_nombre: 'Maciel Entry', metodo: 'POST', ruta: '/api/registros', entidad: 'registros', detalle: '{"maquina_id":"MAQ-001"}' },
   ],
 
+  // Repuestos asociados a un conjunto (GET /maquinas/:id/componentes/:compId/repuestos)
+  componenteRepuestos: [
+    { codigo: 'ROD-001', descripcion: 'Rodamiento 6205-2RS SKF', nro_hauni: 'H-4711' },
+    { codigo: 'COR-001', descripcion: 'Correa A-42 Gates', nro_hauni: null },
+  ],
+
   registros: [
     {
       id: 101,
@@ -223,6 +229,20 @@ async function mockApi(page) {
   // Update / delete de un conjunto puntual
   await page.route(/\/api\/maquinas\/[^/]+\/componentes\/\d+$/, (route) =>
     route.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: 'ok' }) })
+  );
+
+  // Repuestos de un conjunto (GET lista / POST alta) — usado por qr.html
+  await page.route(/\/api\/maquinas\/[^/]+\/componentes\/\d+\/repuestos$/, (route) => {
+    if (route.request().method() === 'POST') {
+      route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ message: 'ok' }) });
+    } else {
+      route.fulfill({ contentType: 'application/json', body: JSON.stringify(FIXTURES.componenteRepuestos) });
+    }
+  });
+
+  // IP LAN para armar la URL del QR (backoffice)
+  await page.route(`${API}/config/lan-ip`, (route) =>
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify({ lan_ip: '' }) })
   );
 
   // Repuesto puntual (GET/PUT/DELETE /repuestos/:codigo)

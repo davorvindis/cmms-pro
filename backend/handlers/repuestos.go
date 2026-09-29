@@ -107,6 +107,8 @@ func (h *RepuestoHandler) Update(c *gin.Context) {
 		return
 	}
 
+	setAuditAntes(c, h.DB, "SELECT codigo, descripcion, nro_hauni, categoria, disciplina, stock_actual, stock_minimo FROM Repuestos WHERE codigo = "+h.D.Param(1), codigo)
+
 	sets := []string{}
 	args := []interface{}{}
 	argIdx := 1
@@ -167,6 +169,7 @@ func (h *RepuestoHandler) Update(c *gin.Context) {
 
 func (h *RepuestoHandler) Delete(c *gin.Context) {
 	codigo := c.Param("codigo")
+	setAuditAntes(c, h.DB, "SELECT codigo, descripcion, nro_hauni, categoria, disciplina, stock_actual, stock_minimo FROM Repuestos WHERE codigo = "+h.D.Param(1), codigo)
 	result, err := h.DB.Exec("DELETE FROM Repuestos WHERE codigo = "+h.D.Param(1), codigo)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al eliminar"})

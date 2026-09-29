@@ -17,12 +17,29 @@ import (
 
 var pinRedact = regexp.MustCompile(`("pin"\s*:\s*)"[^"]*"`)
 
+// auditInsert arma el INSERT parametrizado de AuditLog para el dialecto dado.
+func auditInsert(dialect db.Dialect) string {
+	return fmt.Sprintf(
+		"INSERT INTO AuditLog (usuario_id, usuario_nombre, metodo, ruta, entidad, detalle, ip, antes) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+		dialect.Param(1), dialect.Param(2), dialect.Param(3), dialect.Param(4),
+		dialect.Param(5), dialect.Param(6), dialect.Param(7), dialect.Param(8))
+}
+
+// AuditEvent inserta un evento puntual en AuditLog. Pensado para endpoints
+// publicos que no pasan por el middleware Audit (ej. login). El detalle NUNCA
+// debe incluir pin ni hash.
+func AuditEvent(database *sql.DB, dialect db.Dialect, usuarioID, usuarioNombre, metodo, ruta, entidad, detalle, ip string) {
+	if _, err := database.Exec(auditInsert(dialect),
+		usuarioID, usuarioNombre, metodo, ruta, entidad, detalle, ip, nil); err != nil {
+		log.Printf("audit: %v", err)
+	}
+}
+
 // Audit registra toda escritura exitosa (POST/PUT/DELETE) del grupo autenticado
-// en AuditLog, con el body truncado y el campo pin redactado.
+// en AuditLog, con el body truncado (despues), el campo pin redactado, la IP de
+// origen y — si el handler seteo "audit_antes" — el estado anterior de la fila.
 func Audit(database *sql.DB, dialect db.Dialect) gin.HandlerFunc {
-	insert := fmt.Sprintf(
-		"INSERT INTO AuditLog (usuario_id, usuario_nombre, metodo, ruta, entidad, detalle) VALUES (%s, %s, %s, %s, %s, %s)",
-		dialect.Param(1), dialect.Param(2), dialect.Param(3), dialect.Param(4), dialect.Param(5), dialect.Param(6))
+	insert := auditInsert(dialect)
 
 	return func(c *gin.Context) {
 		if c.Request.Method == "GET" || c.Request.Method == "HEAD" {
@@ -61,8 +78,16 @@ func Audit(database *sql.DB, dialect db.Dialect) gin.HandlerFunc {
 			entidad = parts[0]
 		}
 
+		// Estado anterior de la fila (JSON), seteado por los handlers PUT/DELETE
+		var antes interface{}
+		if v, exists := c.Get("audit_antes"); exists {
+			if s, ok := v.(string); ok && s != "" {
+				antes = s
+			}
+		}
+
 		if _, err := database.Exec(insert, user.ID, user.Nombre, c.Request.Method,
-			c.Request.URL.Path, entidad, detalle); err != nil {
+			c.Request.URL.Path, entidad, detalle, c.ClientIP(), antes); err != nil {
 			log.Printf("audit: %v", err)
 		}
 	}

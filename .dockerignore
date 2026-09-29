@@ -7,5 +7,4 @@ tests
 *.db-shm
 *.db-wal
 backend/cmms.db*
-backend/static
 cmms.db

@@ -215,11 +215,14 @@ test.describe('Maquinas page', () => {
     await expect(row.locator('.badge')).toHaveText('Mant. vencido');
   });
 
-  test('machine row shows QR link pointing to qr.html with correct id param', async ({ page }) => {
+  test('machine row QR button opens modal with qr.html link containing the id param', async ({ page }) => {
+    // El link dejo de ser un <a> en la fila: ahora es un boton que abre el
+    // modal de QR y muestra la URL (origin + qr.html?maquina=...)
     await openBackoffice(page);
     await page.click('text=Maquinas / Activos');
-    const qrLink = page.locator('#equipos-tbody tr').first().locator('a:has-text("QR")');
-    await expect(qrLink).toHaveAttribute('href', `qr.html?maquina=${FIXTURES.maquinas[0].id}`);
+    await page.locator('#equipos-tbody tr').first().locator('button:has-text("QR")').click();
+    await expect(page.locator('#modal-qr')).toHaveClass(/show/);
+    await expect(page.locator('#qr-url')).toContainText(`qr.html?maquina=${FIXTURES.maquinas[0].id}`);
   });
 
   test('machine components are shown as chips (max 3 + overflow badge)', async ({ page }) => {

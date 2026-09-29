@@ -32,25 +32,54 @@ var sqliteMigration004 string
 //go:embed migrations/004_auditoria.sql
 var sqlserverMigration004 string
 
-func Migrate(database *sql.DB, dialect Dialect) {
-	var migration string
-	if dialect.Type == SQLite {
-		migration = sqliteMigration + "\n;\n" + sqliteMigration002 + "\n;\n" + sqliteMigration003 + "\n;\n" + sqliteMigration004
-	} else {
-		migration = sqlserverMigration + "\n;\n" + sqlserverMigration002 + "\n;\n" + sqlserverMigration003 + "\n;\n" + sqlserverMigration004
-	}
+//go:embed migrations/005_auditoria_v2_sqlite.sql
+var sqliteMigration005 string
 
-	for _, stmt := range splitStatements(migration) {
-		if _, err := database.Exec(stmt); err != nil {
-			// SQL Server no tiene IF NOT EXISTS en CREATE TABLE/INDEX: sobre una
-			// DB existente esos statements fallan y hay que seguir de largo para
-			// que corran las migraciones nuevas y ensureColumn.
-			if isAlreadyExists(err) {
-				continue
-			}
-			log.Printf("Migration error on: %.80s...\nError: %v", stmt, err)
-			return
+//go:embed migrations/005_auditoria_v2.sql
+var sqlserverMigration005 string
+
+// migration es una migracion versionada con su SQL por dialecto.
+type migration struct {
+	version string
+	sqlite  string
+	mssql   string
+}
+
+var migrationsList = []migration{
+	{"001_create_tables", sqliteMigration, sqlserverMigration},
+	{"002_tareas", sqliteMigration002, sqlserverMigration002},
+	{"003_mantenimientos", sqliteMigration003, sqlserverMigration003},
+	{"004_auditoria", sqliteMigration004, sqlserverMigration004},
+	{"005_auditoria_v2", sqliteMigration005, sqlserverMigration005},
+}
+
+func Migrate(database *sql.DB, dialect Dialect) {
+	ensureSchemaMigrations(database, dialect)
+
+	for _, m := range migrationsList {
+		if migrationApplied(database, dialect, m.version) {
+			continue
 		}
+		sqlText := m.mssql
+		if dialect.Type == SQLite {
+			sqlText = m.sqlite
+		}
+		for _, stmt := range splitStatements(sqlText) {
+			if _, err := database.Exec(stmt); err != nil {
+				// Primera corrida con SchemaMigrations sobre una DB existente
+				// (prod ya tiene 001-004): los CREATE fallan con "already
+				// exists" y se tolera SOLO ese error, para poder registrar la
+				// version y seguir. Cualquier otro error aborta el arranque.
+				if isAlreadyExists(err) {
+					continue
+				}
+				log.Fatalf("Migracion %s fallo en: %.80s...\nError: %v", m.version, stmt, err)
+			}
+		}
+		if err := registerMigration(database, dialect, m.version); err != nil {
+			log.Fatalf("Migracion %s aplicada pero no se pudo registrar en SchemaMigrations: %v", m.version, err)
+		}
+		fmt.Printf("Migracion %s aplicada\n", m.version)
 	}
 
 	// Columnas agregadas despues del release inicial: los CREATE TABLE IF NOT
@@ -90,6 +119,41 @@ func Migrate(database *sql.DB, dialect Dialect) {
 	fmt.Println("Database migration completed")
 }
 
+// ensureSchemaMigrations crea la tabla de versiones si no existe.
+func ensureSchemaMigrations(database *sql.DB, dialect Dialect) {
+	var ddl string
+	if dialect.Type == SQLite {
+		ddl = `CREATE TABLE IF NOT EXISTS SchemaMigrations (
+			version    TEXT PRIMARY KEY,
+			applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+		)`
+	} else {
+		ddl = `IF OBJECT_ID('SchemaMigrations', 'U') IS NULL
+		CREATE TABLE SchemaMigrations (
+			version    NVARCHAR(50) PRIMARY KEY,
+			applied_at DATETIME2 NOT NULL DEFAULT GETDATE()
+		)`
+	}
+	if _, err := database.Exec(ddl); err != nil {
+		log.Fatalf("No se pudo crear SchemaMigrations: %v", err)
+	}
+}
+
+func migrationApplied(database *sql.DB, dialect Dialect, version string) bool {
+	var count int
+	query := "SELECT COUNT(*) FROM SchemaMigrations WHERE version = " + dialect.Param(1)
+	if err := database.QueryRow(query, version).Scan(&count); err != nil {
+		log.Fatalf("No se pudo consultar SchemaMigrations: %v", err)
+	}
+	return count > 0
+}
+
+func registerMigration(database *sql.DB, dialect Dialect, version string) error {
+	query := "INSERT INTO SchemaMigrations (version) VALUES (" + dialect.Param(1) + ")"
+	_, err := database.Exec(query, version)
+	return err
+}
+
 // ensurePinLength amplia Usuarios.pin en SQL Server si quedo con el largo
 // original (sqlite es TEXT, no aplica). Corre antes de security.BackfillPins.
 func ensurePinLength(database *sql.DB, dialect Dialect) {
@@ -116,7 +180,8 @@ func isAlreadyExists(err error) bool {
 	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "already an object named") || // mssql tabla
 		strings.Contains(msg, "already exists") || // mssql indice / sqlite
-		strings.Contains(msg, "duplicate column")
+		strings.Contains(msg, "duplicate column") || // sqlite columna
+		strings.Contains(msg, "column names in each table must be unique") // mssql columna
 }
 
 // ensureColumn agrega una columna a una tabla existente si todavia no esta.

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"cmms-backend/db"
+	"cmms-backend/middleware"
 	"cmms-backend/models"
 	"cmms-backend/security"
 
@@ -38,10 +39,15 @@ func (h *UsuarioHandler) Login(c *gin.Context) {
 	var stored string
 	err := h.DB.QueryRow(query, req.ID).Scan(&user.ID, &user.Nombre, &user.Rol, &stored, &user.PuedeIngresar, &user.Estado, &user.Disciplina)
 	if err != nil || !security.CheckPin(stored, req.Pin) {
+		// Auditoria de login fallido: usuario intentado + IP, sin pin ni hash
+		middleware.AuditEvent(h.DB, h.D, req.ID, "", "POST", c.Request.URL.Path,
+			"login_fallido", "credenciales invalidas", c.ClientIP())
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Credenciales invalidas"})
 		return
 	}
 	security.LoginSucceeded(rlKey)
+	middleware.AuditEvent(h.DB, h.D, user.ID, user.Nombre, "POST", c.Request.URL.Path,
+		"login", "login exitoso", c.ClientIP())
 
 	// PIN legado en texto plano: se migra a hash en el primer login exitoso
 	if !security.IsHashed(stored) {
@@ -147,6 +153,9 @@ func (h *UsuarioHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos invalidos"})
 		return
 	}
+
+	// Estado anterior SIN pin (secreto): jamas al AuditLog.
+	setAuditAntes(c, h.DB, "SELECT id, nombre, rol, puede_ingresar, estado, disciplina FROM Usuarios WHERE id = "+h.D.Param(1), id)
 
 	sets := []string{}
 	args := []interface{}{}

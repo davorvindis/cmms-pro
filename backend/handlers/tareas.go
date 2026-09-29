@@ -192,6 +192,8 @@ func (h *TareaHandler) Update(c *gin.Context) {
 		return
 	}
 
+	setAuditAntes(c, h.DB, "SELECT id, maquina_id, nombre, descripcion, tiempo_estimado_min, frecuencia, disciplina, asignado_id, orden, activa FROM Tareas WHERE id = "+h.D.Param(1), id)
+
 	sets := []string{}
 	args := []interface{}{}
 	argIdx := 1
@@ -275,6 +277,7 @@ func (h *TareaHandler) Update(c *gin.Context) {
 
 func (h *TareaHandler) Delete(c *gin.Context) {
 	id := c.Param("id")
+	setAuditAntes(c, h.DB, "SELECT id, maquina_id, nombre, descripcion, tiempo_estimado_min, frecuencia, disciplina, asignado_id, orden, activa FROM Tareas WHERE id = "+h.D.Param(1), id)
 	result, err := h.DB.Exec("DELETE FROM Tareas WHERE id = "+h.D.Param(1), id)
 	if err != nil {
 		// FK desde RegistroTareas sin CASCADE: la tarea tiene ejecuciones

@@ -25,6 +25,8 @@ type auditRow struct {
 	Ruta          string  `json:"ruta"`
 	Entidad       string  `json:"entidad"`
 	Detalle       *string `json:"detalle"`
+	IP            *string `json:"ip"`
+	Antes         *string `json:"antes"`
 }
 
 func (h *AuditoriaHandler) List(c *gin.Context) {
@@ -33,7 +35,7 @@ func (h *AuditoriaHandler) List(c *gin.Context) {
 		limit = l
 	}
 
-	query := fmt.Sprintf("SELECT %sid, %s, usuario_id, usuario_nombre, metodo, ruta, entidad, detalle FROM AuditLog WHERE 1=1",
+	query := fmt.Sprintf("SELECT %sid, %s, usuario_id, usuario_nombre, metodo, ruta, entidad, detalle, ip, antes FROM AuditLog WHERE 1=1",
 		h.D.Top(limit), h.D.DateTimeToStr("fecha"))
 	var args []interface{}
 	argIdx := 1
@@ -60,7 +62,7 @@ func (h *AuditoriaHandler) List(c *gin.Context) {
 	items := []auditRow{}
 	for rows.Next() {
 		var a auditRow
-		if err := rows.Scan(&a.ID, &a.Fecha, &a.UsuarioID, &a.UsuarioNombre, &a.Metodo, &a.Ruta, &a.Entidad, &a.Detalle); err != nil {
+		if err := rows.Scan(&a.ID, &a.Fecha, &a.UsuarioID, &a.UsuarioNombre, &a.Metodo, &a.Ruta, &a.Entidad, &a.Detalle, &a.IP, &a.Antes); err != nil {
 			continue
 		}
 		items = append(items, a)

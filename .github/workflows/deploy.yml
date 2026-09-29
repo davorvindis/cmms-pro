@@ -1,0 +1,47 @@
+# Deploy manual del CMMS a Azure Container Apps.
+#
+# REQUISITO PREVIO (todavia NO configurado): el secret AZURE_CREDENTIALS en el
+# repo (Settings → Secrets and variables → Actions). Es el JSON de un service
+# principal con permisos sobre rg-maquinas-prod y el ACR compartido:
+#
+#   az ad sp create-for-rbac --name "gh-cmms-deploy" --role contributor \
+#     --scopes /subscriptions/15900c96-4a2d-493b-ab12-912d521b3113/resourceGroups/rg-maquinas-prod \
+#     --sdk-auth
+#
+# (y darle AcrPush sobre acrespertshared). Sin ese secret, el workflow falla
+# en el paso "az login".
+#
+# Uso: Actions → Deploy CMMS → Run workflow → ingresar el tag (ej: v17).
+
+name: Deploy CMMS
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag de version de la imagen (ej: v17)'
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Az login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Build de la imagen en el ACR compartido
+        run: az acr build --registry acrespertshared --image cmms:${{ inputs.tag }} .
+
+      - name: Actualizar la Container App
+        run: |
+          az containerapp update \
+            -n ca-cmms-prod \
+            -g rg-maquinas-prod \
+            --image acrespertshared.azurecr.io/cmms:${{ inputs.tag }}

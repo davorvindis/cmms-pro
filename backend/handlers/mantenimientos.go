@@ -272,6 +272,8 @@ func (h *MantenimientoHandler) Update(c *gin.Context) {
 		return
 	}
 
+	setAuditAntes(c, h.DB, "SELECT id, maquina_id, titulo, horas_marcha, horas_turbinas, estado, disciplina, creado_por_id, fecha_completado, registro_id FROM Mantenimientos WHERE id = "+h.D.Param(1), id)
+
 	estado, maquinaID, err := h.getEstado(id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Mantenimiento no encontrado"})
@@ -464,6 +466,7 @@ func (h *MantenimientoHandler) Completar(c *gin.Context) {
 
 func (h *MantenimientoHandler) Delete(c *gin.Context) {
 	id := c.Param("id")
+	setAuditAntes(c, h.DB, "SELECT id, maquina_id, titulo, horas_marcha, horas_turbinas, estado, disciplina, creado_por_id, fecha_completado, registro_id FROM Mantenimientos WHERE id = "+h.D.Param(1), id)
 
 	estado, _, err := h.getEstado(id)
 	if err != nil {

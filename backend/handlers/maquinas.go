@@ -131,6 +131,8 @@ func (h *MaquinaHandler) Update(c *gin.Context) {
 		return
 	}
 
+	setAuditAntes(c, h.DB, "SELECT id, nombre, ubicacion, serie, estado, ultimo_mantenimiento, proximo_mantenimiento, frecuencia_mantenimiento, plc, hmi, hmi_estado, doc_url FROM Maquinas WHERE id = "+h.D.Param(1), id)
+
 	sets := []string{}
 	args := []interface{}{}
 	argIdx := 1
@@ -229,6 +231,7 @@ func nilIfBlank(s *string) interface{} {
 
 func (h *MaquinaHandler) Delete(c *gin.Context) {
 	id := c.Param("id")
+	setAuditAntes(c, h.DB, "SELECT id, nombre, ubicacion, serie, estado, ultimo_mantenimiento, proximo_mantenimiento, frecuencia_mantenimiento, plc, hmi, hmi_estado, doc_url FROM Maquinas WHERE id = "+h.D.Param(1), id)
 	result, err := h.DB.Exec("DELETE FROM Maquinas WHERE id = "+h.D.Param(1), id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al eliminar"})
